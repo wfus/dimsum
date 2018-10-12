@@ -1,4 +1,3 @@
-
 /********************************************************************
 This code is based on Approximate frequent items in a data stream
 G. Cormode 2002, 2003,2005
