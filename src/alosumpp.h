@@ -48,7 +48,7 @@ public:
     int point_est();
     int point_err();
     void check_hash();
-    std::map<uint32_t, uint32_t> output();
+    std::map<uint32_t, uint32_t> output(uint64_t);
     int in_place_find_kth();
 
     // debugging functions

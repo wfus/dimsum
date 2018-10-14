@@ -56,7 +56,7 @@ void ALS::init_passive() {
 	nPassive = 0;
 }
 
-ALS::destroy_passive() {
+void ALS::destroy_passive() {
     free(passiveHashtable);
     free(passiveCounters);
 }
@@ -91,3 +91,41 @@ std::map<uint32_t, uint32_t> ALS::output(uint64_t thresh) {
 int ALS::in_place_find_kth() {
 
 };
+
+/**
+ * Shows the hashtable for debugging purposes
+ */
+void ALS::show_hash() {
+	int i;
+	ALSCounter* hashptr;
+
+	for (i = 0; i < hashsize; i++)
+	{
+		printf("%d:", i);
+		hashptr = activeHashtable[i];
+		while (hashptr) {
+			printf(" %p [h(%u) = %d, prev = %p] ---> ", hashptr,
+				(unsigned int)hashptr->item,
+				hashptr->hash,
+				hashptr->prev);
+			hashptr = hashptr->next;
+		}
+		printf(" *** \n");
+	}
+}
+
+/**
+ * Shows the heap for debugging purposes
+ */
+void ALS::show_heap() {
+    int i;
+    int j = 1;
+    for (i = 1; i <= countersize; i++) {
+		std::cout << (int) activeCounters[i].count;
+		if (i == j) {
+            std::cout << std::endl;
+			j = 2 * j + 1;
+		}
+	}
+    std::cout << std::endl << std::endl;
+}
