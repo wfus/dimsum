@@ -202,8 +202,6 @@ void ALS_AddItem(ALS_type *ALS, ALSitem_t item, ALSweight_t value) {
 }
 
 
-
-
 int ALS_in_place_find_kth(int *v, int n, int k, int jump, int pivot) {
 	assert(k < n);
 	if ((n == 1) && (k == 0)) return v[0];
@@ -317,7 +315,6 @@ void ALS_RestartMaintenance(ALS_type* ALS) {
 	assert(ALS->extra >= 0);
 	ALS_Maintenance(ALS);
 }
-
 
 
 void ALS_Update(ALS_type* ALS, ALSitem_t item, ALSweight_t value)

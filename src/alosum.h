@@ -44,7 +44,7 @@ typedef struct ALS_type {
 	ALSCounter ** passiveHashtable; // array of pointers to items in 'counters'
 } ALS_type;
 
-extern ALS_type * ALS_Init(float fPhi, float gamma = GAMMA);
+extern ALS_type* ALS_Init(float fPhi, float gamma = GAMMA);
 extern void ALS_Destroy(ALS_type *);
 extern void ALS_Update(ALS_type *, ALSitem_t, int);
 extern int ALS_Size(ALS_type *);
