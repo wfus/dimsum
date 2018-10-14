@@ -1,3 +1,10 @@
+# Object files
+*.o
+
+# Mac Files
+*.DS_Store
+*__pycache__*
+
 src/*.sdf
 figures/*
 results/*
