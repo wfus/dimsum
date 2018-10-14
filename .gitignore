@@ -1,5 +1,7 @@
 # Object files
 *.o
+*.d
+*.gch
 
 # Mac Files
 *.DS_Store
@@ -10,6 +12,9 @@
 
 # Huge data files
 trace/
+
+# CMake build system
+build
 
 src/*.sdf
 figures/*
