@@ -1,14 +1,14 @@
-CXXFLAGS=-O2 -DNDEBUG -m32
+CXXFLAGS=-O2 -stdlib=libstdc++ -std=c++11
 CXX=g++
 
-PCAP=-L../lib/winpcap/Lib -llibwpcap -I../lib/winpcap/Include
-OBJECTS=rand48.o prng.o lossycount.o countmin.o ccfc.o 
+# PCAP=-L../lib/winpcap/Lib -llibwpcap -I../lib/winpcap/Include
+OBJECTS=rand48.o prng.o alosum.o
 
 all: $(OBJECTS)
-	$(CXX) $(CXXFLAGS) hh.cc $(OBJECTS) -o Release/hh-zipf
-	$(CXX) $(CXXFLAGS) hh.cc $(OBJECTS) -o Release/hh-pcap -DPCAP $(PCAP)
+	$(CXX) $(CXXFLAGS) hh.cc $(OBJECTS) -o main.o 
+	# $(CXX) $(CXXFLAGS) hh.cc $(OBJECTS) -o Release/hh-pcap -DPCAP $(PCAP)
 
-$(OBJECTS): rand48.h prng.h lossycount.h countmin.h ccfc.h
+$(OBJECTS): rand48.h prng.h alosum.h
 	$(CXX) $(CXXFLAGS) -c $*.cc
 
 clean:
