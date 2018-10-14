@@ -11,19 +11,19 @@
 //#define max(x,y)	((x) > (y) ? (x) : (y))
 
 typedef struct CM_type{
-  int64_t count;
-  int depth;
-  int width;
-  int ** counts;
-  unsigned int *hasha, *hashb;
+	int64_t count;
+	int depth;
+	int width;
+	int ** counts;
+	unsigned int *hasha, *hashb;
 } CM_type;
 
 typedef struct CMF_type{ // shadow of above stucture with floats
-  double count;
-  int depth;
-  int width;
-  double ** counts;
-  unsigned int *hasha, *hashb;
+	double count;
+	int depth;
+	int width;
+	double ** counts;
+	unsigned int *hasha, *hashb;
 } CMF_type;
 
 extern CM_type * CM_Init(int, int, int);
@@ -47,15 +47,15 @@ extern double CMF_InnerProd(CMF_type *, CMF_type *);
 extern double CMF_PointProd(CMF_type *, CMF_type *, unsigned int);
 
 typedef struct CMH_type{
-  int64_t count;
-  int U; // size of the universe in bits
-  int gran; // granularity: eg 1, 4 or 8 bits
-  int levels; // function of U and gran
-  int freelim; // up to which level to keep exact counts
-  int depth;
-  int width;
-  int ** counts;
-  unsigned int **hasha, **hashb;
+	int64_t count;
+	int U; // size of the universe in bits
+	int gran; // granularity: eg 1, 4 or 8 bits
+	int levels; // function of U and gran
+	int freelim; // up to which level to keep exact counts
+	int depth;
+	int width;
+	int ** counts;
+	unsigned int **hasha, **hashb;
 } CMH_type;
 
 extern CMH_type * CMH_Init(int, int, int, int);

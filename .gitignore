@@ -8,6 +8,9 @@
 # VSCode Files
 *.vscode
 
+# Huge data files
+trace/
+
 src/*.sdf
 figures/*
 results/*

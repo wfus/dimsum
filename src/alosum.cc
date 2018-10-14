@@ -3,11 +3,10 @@
 #include "alosum.h"
 #include "prng.h"
 #include "math.h"
-#include <windows.h>
 
 
 #define ALS_NULLITEM 0x7FFFFFFF
-#define swap(x,y) do{int t=x; x=y; y=t;} while(0)
+#define swap(x,y) do {int t=x; x=y; y=t;} while(0)
 
 void ALS_InitPassive(ALS_type *ALS) {
 	ALS->passiveCounters =
@@ -27,8 +26,7 @@ void ALS_InitPassive(ALS_type *ALS) {
 	ALS->nPassive = 0;
 }
 
-ALS_type * ALS_Init(float fPhi, float gamma)
-{
+ALS_type* ALS_Init(float fPhi, float gamma) {
 	int i;
 	int k = 1 + (int) 1.0 / fPhi;
 
@@ -75,9 +73,9 @@ void ALS_DestroyPassive(ALS_type* ALS) {
 	free(ALS->passiveHashtable);
 	free(ALS->passiveCounters);
 }
-void ALS_Destroy(ALS_type * ALS)
-{
-	std::cerr << "Destroy A" << std::endl;
+
+void ALS_Destroy(ALS_type * ALS) {
+	// std::cerr << "Destroy A" << std::endl;
 	free(ALS->activeHashtable);
 	free(ALS->activeCounters);
 	free(ALS->buffer);
@@ -85,8 +83,7 @@ void ALS_Destroy(ALS_type * ALS)
 	free(ALS);
 }
 
-void ALS_RebuildHash(ALS_type * ALS)
-{
+void ALS_RebuildHash(ALS_type * ALS) {
 	// rebuild the hash table and linked list pointers based on current
 	// contents of the counters array
 	int i;
@@ -117,10 +114,9 @@ void ALS_RebuildHash(ALS_type * ALS)
 	}
 }
 
-
-ALSCounter * ALS_FindItemInActive(ALS_type * ALS, ALSitem_t item)
-{ // find a particular item in the date structure and return a pointer to it
-	ALSCounter * hashptr;
+ALSCounter * ALS_FindItemInActive(ALS_type* ALS, ALSitem_t item) {
+	// find a particular item in the date structure and return a pointer to it
+	ALSCounter* hashptr;
 	int hashval;
 	
 	hashval = (int)hash31(ALS->hasha, ALS->hashb, item) % ALS->hashsize;
@@ -133,17 +129,15 @@ ALSCounter * ALS_FindItemInActive(ALS_type * ALS, ALSitem_t item)
 	// the hash table
 
 	while (hashptr) {
-		if (hashptr->item == item)
-			break;
+		if (hashptr->item == item) break;
 		else hashptr = hashptr->next;
 	}
-	
 	return hashptr;
 	// returns NULL if we do not find the item
 }
 
-ALSCounter * ALS_FindItemInPassive(ALS_type * ALS, ALSitem_t item)
-{ // find a particular item in the date structure and return a pointer to it
+ALSCounter * ALS_FindItemInPassive(ALS_type * ALS, ALSitem_t item) {
+	// find a particular item in the date structure and return a pointer to it
 	ALSCounter * hashptr;
 	int hashval;
 
@@ -153,18 +147,16 @@ ALSCounter * ALS_FindItemInPassive(ALS_type * ALS, ALSitem_t item)
 	// the hash table
 
 	while (hashptr) {
-		if (hashptr->item == item)
-			break;
+		if (hashptr->item == item) break;
 		else hashptr = hashptr->next;
 	}
-
 	return hashptr;
 	// returns NULL if we do not find the item
 }
 
 
-ALSCounter * ALS_FindItem(ALS_type * ALS, ALSitem_t item)
-{ // find a particular item in the data structure and return a pointer to it
+ALSCounter * ALS_FindItem(ALS_type * ALS, ALSitem_t item) {
+	// find a particular item in the data structure and return a pointer to it
 	ALSCounter * hashptr;
 	int hashval;
 	hashptr = ALS_FindItemInActive(ALS, item);
@@ -234,7 +226,6 @@ int ALS_in_place_find_kth(int *v, int n, int k, int jump, int pivot) {
 				}
 				swap(w[j0*jump], w[jmin*jump]);
 			}
-		
 		}
 		pivot = ALS_in_place_find_kth(v + 2*jump, (n+2)/5, (n + 2) / 5 / 2, jump * 5);
 	}
@@ -269,7 +260,7 @@ int ALS_in_place_find_kth(int *v, int n, int k, int jump, int pivot) {
 	}
 }
 
-DWORD WINAPI ALS_Maintenance(LPVOID lpParam) {
+uint32_t ALS_Maintenance(void* lpParam) {
 	// FINISH MAINTENANCE	
 	// dnd quantile
 	ALS_type* ALS = (ALS_type*) lpParam;
@@ -329,10 +320,10 @@ void ALS_RestartMaintenance(ALS_type* ALS) {
 
 
 
-void ALS_Update(ALS_type * ALS, ALSitem_t item, ALSweight_t value)
+void ALS_Update(ALS_type* ALS, ALSitem_t item, ALSweight_t value)
 {
 	int hashval;
-	ALSCounter * hashptr;
+	ALSCounter* hashptr;
 	// find whether new item is already stored, if so store it and add one
 	// update heap property if necessary
 	ALS->n += value;
@@ -363,50 +354,52 @@ void ALS_Update(ALS_type * ALS, ALSitem_t item, ALSweight_t value)
 		// Now add the item to the active hash table.
 		--(ALS->extra);
 		ALS_AddItem(ALS, item, value);
-		
 	}
 	//ALS_CheckHash(ALS, item, 0);
 }
 
-int ALS_Size(ALS_type * ALS)
-{ // return the size of the data structure in bytes
-	return sizeof(ALS_type) + ALS->size*sizeof(int) // size of median buffer
-		+ 2*(ALS->hashsize * sizeof(ALSCounter*)) // two hash tables
-		+ 2*(ALS->size*sizeof(ALSCounter)); // two counter arrays
+/**
+ * Returns the size of the data struture in bytes
+ */
+int ALS_Size(ALS_type* ALS) {
+	return sizeof(ALS_type) + ALS->size * sizeof(int) // size of median buffer
+		+ 2 * (ALS->hashsize * sizeof(ALSCounter*))   // two hash tables
+		+ 2 * (ALS->size * sizeof(ALSCounter));       // two counter arrays
 }
 
-ALSweight_t ALS_PointEst(ALS_type * ALS, ALSitem_t item)
-{ // estimate the count of a particular item
-	ALSCounter * i;
+/**
+ * Estimates the count of a specific ID
+ */
+ALSweight_t ALS_PointEst(ALS_type* ALS, ALSitem_t item) {
+	ALSCounter* i;
 	i = ALS_FindItem(ALS, item);
-	if (i)
-		return(i->count);
-	else
-		return ALS->quantile;
+	return i ? i->count : ALS->quantile;
 }
 
-ALSweight_t ALS_PointErr(ALS_type * ALS, ALSitem_t item)
-{ // estimate the worst case error in the estimate of a particular item
+ALSweight_t ALS_PointErr(ALS_type* ALS, ALSitem_t item) {
+	// estimate the worst case error in the estimate of a particular item
 	return ALS->quantile;
 }
 
-int ALS_cmp(const void * a, const void * b) {
-	ALSCounter * x = (ALSCounter*)a;
-	ALSCounter * y = (ALSCounter*)b;
-	if (x->count<y->count) return -1;
-	else if (x->count>y->count) return 1;
+int ALS_cmp(const void* a, const void* b) {
+	ALSCounter* x = (ALSCounter*) a;
+	ALSCounter* y = (ALSCounter*) b;
+	if (x->count < y->count) return -1;
+	else if (x->count > y->count) return 1;
 	else return 0;
 }
 
-void ALS_Output(ALS_type * ALS) { // prepare for output
+/**
+ * Prepares for output.
+ */
+void ALS_Output(ALS_type* ALS) {
 }
 
 std::map<uint32_t, uint32_t> ALS_Output(ALS_type * ALS, uint64_t thresh)
 {
 	std::map<uint32_t, uint32_t> res;
 
-	for (int i = 0; i < ALS->nActive; ++i)
-	{
+	for (int i = 0; i < ALS->nActive; ++i) {
 		if (ALS->activeCounters[i].count >= thresh)
 			res.insert(std::pair<uint32_t, uint32_t>(ALS->activeCounters[i].item, ALS->activeCounters[i].count));
 	}
@@ -420,12 +413,12 @@ std::map<uint32_t, uint32_t> ALS_Output(ALS_type * ALS, uint64_t thresh)
 	return res;
 }
 
-void ALS_CheckHash(ALS_type * ALS, int item, int hash)
-{ // debugging routine to validate the hash table
+void ALS_CheckHash(ALS_type* ALS, int item, int hash) {
+	// debugging routine to validate the hash table
 	int i;
 	ALSCounter *hashptr, *prev;
 
-	for (i = 0; i<ALS->hashsize; i++)
+	for (i = 0; i < ALS->hashsize; i++)
 	{
 		prev = NULL;
 		hashptr = ALS->activeHashtable[i];
@@ -438,8 +431,7 @@ void ALS_CheckHash(ALS_type * ALS, int item, int hash)
 			}
 			if (hashptr->prev != prev)
 			{
-				printf("\n Previous violation! prev = %d, should be %d\n",
-					(int)hashptr->prev, (int)prev);
+				printf("\n Previous violation! prev = %p, should be %p\n", hashptr->prev, prev);
 				printf("after inserting item %d with hash %d\n", item, hash);
 				exit(EXIT_FAILURE);
 			}
@@ -449,8 +441,8 @@ void ALS_CheckHash(ALS_type * ALS, int item, int hash)
 	}
 }
 
-void ALS_ShowHash(ALS_type * ALS)
-{ // debugging routine to show the hashtable
+void ALS_ShowHash(ALS_type* ALS) {
+	// debugging routine to show the hashtable
 	int i;
 	ALSCounter * hashptr;
 
@@ -459,27 +451,25 @@ void ALS_ShowHash(ALS_type * ALS)
 		printf("%d:", i);
 		hashptr = ALS->activeHashtable[i];
 		while (hashptr) {
-			printf(" %d [h(%u) = %d, prev = %d] ---> ", (int)hashptr,
+			printf(" %p [h(%u) = %d, prev = %p] ---> ", hashptr,
 				(unsigned int)hashptr->item,
 				hashptr->hash,
-				(int)hashptr->prev);
+				hashptr->prev);
 			hashptr = hashptr->next;
 		}
 		printf(" *** \n");
 	}
 }
 
-
-void ALS_ShowHeap(ALS_type * ALS)
-{ // debugging routine to show the heap
-	int i, j;
-
-	j = 1;
-	for (i = 1; i <= ALS->size; i++)
-	{
+/**
+ * Debugging routine that shows the heap
+ */
+void ALS_ShowHeap(ALS_type* ALS) { 
+	int i;
+	int j = 1;
+	for (i = 1; i <= ALS->size; i++) {
 		printf("%d ", (int)ALS->activeCounters[i].count);
-		if (i == j)
-		{
+		if (i == j) {
 			printf("\n");
 			j = 2 * j + 1;
 		}

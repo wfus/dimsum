@@ -3,7 +3,6 @@
 #include "losum.h"
 #include "prng.h"
 #include "math.h"
-#include <windows.h>
 
 #define STEPS_AT_A_TIME 1
 #define BLOCK_SIZE 1

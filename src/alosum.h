@@ -1,6 +1,8 @@
+/*
+ * Implementation of the IM-SUM Algorithm. 
+ */
 #pragma once
 #include "prng.h"
-#include <windows.h>
 // losum.h -- header file for Lossy Summing
 
 /////////////////////////////////////////////////////////
@@ -13,8 +15,7 @@
 #define GAMMA 1.0
 typedef struct ALScounter_t ALSCounter;
 
-struct ALScounter_t
-{
+struct ALScounter_t {
 	ALSitem_t item; // item identifier
 	int hash; // its hash value
 	ALSweight_t count; // (upper bound on) count for the item
@@ -27,8 +28,7 @@ struct ALScounter_t
 #define ALS_SPACE (ALS_HASHMULT*ALS_SIZE)
 #endif
 
-typedef struct ALS_type
-{
+typedef struct ALS_type {
 	ALSweight_t n;
 	int hasha, hashb, hashsize;
 	int size, maxMaintenanceTime;
@@ -37,7 +37,7 @@ typedef struct ALS_type
 	int quantile;
 	float epsilon;
 	float gamma;
-	HANDLE handle;
+	void* handle;
 	ALSCounter *activeCounters;
 	ALSCounter *passiveCounters;
 	ALSCounter ** activeHashtable; // array of pointers to items in 'counters'

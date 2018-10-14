@@ -1,6 +1,5 @@
 #pragma once
 #include "prng.h"
-// #include <windows.h>
 #include <atomic>
 // losum.h -- header file for Lossy Summing
 
