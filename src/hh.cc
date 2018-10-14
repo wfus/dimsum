@@ -66,6 +66,11 @@ uint64_t StopTheClock(time_point<Clock> &start) {
 void CheckOutput(std::map<uint32_t, uint32_t>& res, uint64_t thresh, size_t hh,
 				 Stats& S, const std::vector<uint32_t>& exact) 
 {
+	/*
+	std::cout << "Exact heavy hitter ids" << std::endl;
+	for (auto hitter : exact) {
+		std::cout << hitter << " ";
+	}*/
 	if (res.empty()) {
 		S.F.insert(0.0);
 		S.F2.insert(0.0);
