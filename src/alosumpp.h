@@ -49,13 +49,23 @@ public:
     int point_err();
     void check_hash();
     std::map<uint32_t, uint32_t> output(uint64_t);
-    int in_place_find_kth();
+    int in_place_find_kth(int*, int, int, int, int);
 
     // debugging functions
     void show_hash();
     void show_heap();
 
+    // query functions
+    ALSCounter* find_item(ALSitem_t);
+
+    // modification
+    void add_item(ALSitem_t, ALSweight_t);
+
 private:
     void init_passive();
     void destroy_passive();
+    
+    // internal query functions
+    ALSCounter* find_item_in_active(ALSitem_t);
+    ALSCounter* find_item_in_passive(ALSitem_t);
 };
