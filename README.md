@@ -7,3 +7,7 @@ It is an extension of code by G. Cormode published here: http://hadjieleftheriou
 Our extensions of Cormode's code are the python scripts for evaluation (python/*),
 the implementation of the IMSum algorithm (src/alosum.*) and the implementation of the DIMSum algorithm (src/losum.*).
 In addition, we have edited the hh.cc file to include evaluation for the added algorithms.
+
+## Traces
+
+All of the traces were available from [CAIDA](http://www.caida.org/data/), the center for applied internet data analysis.
