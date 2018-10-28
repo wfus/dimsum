@@ -411,7 +411,9 @@ int main(int argc, char **argv)
 	CM_type* cm = CM_Init(u32Width, u32Depth, 0);
 	
 	// Number of runs to complete one pass through our trace. 
-	size_t stRunSize = data.size() / stRuns;
+	const size_t MAX_TRACE_SIZE = 100000;
+	size_t experimentSize = data.size() > MAX_TRACE_SIZE ? MAX_TRACE_SIZE : data.size();
+	size_t stRunSize = experimentSize / stRuns;
 	std::cout << "Total Number of Packets in Trace: " << data.size() << std::endl;
 	std::cout << "Number of packets in each run: " << stRunSize << std::endl;
 	size_t stStreamPos = 0;
