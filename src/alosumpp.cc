@@ -119,13 +119,13 @@ std::map<uint32_t, uint32_t> ALS::output(uint64_t thresh) {
 	std::map<uint32_t, uint32_t> res;
     // Iterate through active block. Then, we iterate through 
 	for (int i = 0; i < nActive; ++i) {
-		if (activeCounters[i].count >= thresh)
+		if (activeCounters[i].count >= static_cast<int>(thresh))
 			res.insert(std::pair<uint32_t, uint32_t>(activeCounters[i].item, activeCounters[i].count));
 	}
 	// If we see it in passive, maybe it was dupliced and is also in active
 	for (int i = 0; i < nPassive; ++i) {
 		if (find_item_in_active(passiveCounters[i].item) == NULL) {
-			if (passiveCounters[i].count >= thresh) {
+			if (passiveCounters[i].count >= static_cast<int>(thresh)) {
 				res.insert(std::pair<uint32_t, uint32_t>(passiveCounters[i].item, passiveCounters[i].count));
 			}
 		}

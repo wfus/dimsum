@@ -1,20 +1,21 @@
 /********************************************************************
-This code is based on Approximate frequent items in a data stream
-G. Cormode 2002, 2003,2005
+This code is based on Approximate frequent items in a data stream from
+the work of G. Cormode 2002, 2003,2005.
 
-Last modified: December 2016
+Handles the evaluation of different 
 *********************************************************************/
 #define VERBOSE_STATS true
+#define VERBOSE_EXACT false
 
 #include "countmin.h"  // naive count min sketch
 
 // #include "losum.h"
 #include "alosum.h"
-// #include "alosumpp.h"
 #include <fstream>
 #include <chrono>
 #include <thread>
 #include <sys/time.h>
+#include <cstring>
 
 
 using Clock = std::chrono::steady_clock;
@@ -35,14 +36,14 @@ public:
 
 void usage() {
 	std::cerr
-		<< "Usage: graham\n"
-		<< "  -np		number of packets\n"
-		<< "  -r		number of runs\n"
-		<< "  -phi		phi\n"
-		<< "  -d		depth\n"
-		<< "  -g		granularity\n"
-		<< "  -gamma    DIM-SUM coefficient\n"
-		<< "  -z    skew\n"
+		<< "Usage: graham"                   << std::endl
+		<< "\t-np		number of packets"   << std::endl
+		<< "\t-r		number of runs"      << std::endl
+		<< "\t-phi		phi"                 << std::endl
+		<< "\t-d		depth"               << std::endl
+		<< "\t-g		granularity"         << std::endl
+		<< "\t-gamma    DIM-SUM coefficient" << std::endl
+		<< "\t-z        skew"                << std::endl
 		<< std::endl;
 }
 
@@ -62,11 +63,9 @@ uint64_t StopTheClock(time_point<Clock> &start) {
 /**
  * Calculates statitics for our heavy hitter algorithms, compared to the
  * actual actual values (since our algorithms overestimate)
- * 		F - 
  */
 void CheckOutput(std::map<uint32_t, uint32_t>& res, uint64_t thresh, size_t hh,
-				 Stats& S, const std::vector<uint32_t>& exact) 
-{
+				 Stats& S, const std::vector<uint32_t>& exact) {
 	/*
 	std::cout << "Exact heavy hitter ids" << std::endl;
 	for (auto hitter : exact) {
@@ -150,14 +149,12 @@ void PrintTimes(std::string title, std::vector<uint64_t> times) {
 /**
  * Pretty prints our statistics class.
  */
-void PrintOutput(std::string title, size_t size, const Stats& S,
-				 size_t u32NumberOfPackets) {
+void PrintOutput(std::string title, size_t size, const Stats& S, size_t u32NumberOfPackets) {
 	double p5th = -1.0, p95th = -1.0, r5th = -1.0, r95th = -1.0, f5th = -1.0, f95th = -1.0, f25th = -1.0, f295th = -1.0;
 	size_t i5, i95;
 	std::multiset<double>::const_iterator it;
 
-	if (! S.P.empty())
-	{
+	if (! S.P.empty()) {
 		it = S.P.begin();
 		i5 = (size_t) (S.P.size() * 0.05);
 		for (size_t i = 0; i < i5; ++i) ++it;
@@ -167,8 +164,7 @@ void PrintOutput(std::string title, size_t size, const Stats& S,
 		p95th = *it;
 	}
 
-	if (! S.R.empty())
-	{
+	if (! S.R.empty()) {
 		it = S.R.begin();
 		i5 = S.R.size() * 0.05;
 		for (size_t i = 0; i < i5; ++i) ++it;
@@ -178,8 +174,7 @@ void PrintOutput(std::string title, size_t size, const Stats& S,
 		r95th = *it;
 	}
 
-	if (! S.F.empty())
-	{
+	if (! S.F.empty()) {
 		it = S.F.begin();
 		i5 = S.F.size() * 0.05;
 		for (size_t i = 0; i < i5; ++i) ++it;
@@ -189,8 +184,7 @@ void PrintOutput(std::string title, size_t size, const Stats& S,
 		f95th = *it;
 	}
 
-	if (! S.F2.empty())
-	{
+	if (! S.F2.empty()) {
 		it = S.F2.begin();
 		i5 = S.F2.size() * 0.05;
 		for (size_t i = 0; i < i5; ++i) ++it;
@@ -199,9 +193,11 @@ void PrintOutput(std::string title, size_t size, const Stats& S,
 		for (size_t i = 0; i < (i95 - i5); ++i) ++it;
 		f295th = *it;
 	}
+	
 	if (S.dU <= 0) {
 		printf("Error! Total update time %f not positive\n", S.dU);
 	}
+	
 	printf("%s\t%1.2f\t%zd\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\t%1.2f\n",
 		title.c_str(), u32NumberOfPackets / S.dU, size,
 		(S.R.size() > 0) ? S.dR / S.R.size():0, r5th, r95th,
@@ -211,6 +207,9 @@ void PrintOutput(std::string title, size_t size, const Stats& S,
 	);
 }
 
+/**
+ * Uses the slow algorithm to find which streams have above a certain threshold.
+ */
 size_t RunExact(uint64_t thresh, std::vector<uint32_t>& exact) {
 	size_t hh = 0;
 	for (size_t i = 0; i < exact.size(); ++i) {
@@ -221,17 +220,16 @@ size_t RunExact(uint64_t thresh, std::vector<uint32_t>& exact) {
 
 /******************************************************************/
 
-int main(int argc, char **argv) 
-{
-	// algorithm and data parameters 
+int main(int argc, char **argv) {
+	// algorithm and data default parameters
 	size_t stNumberOfPackets = 10000000;
-	size_t stRuns = 100;
-	double dPhi = 0.001; //0.000001;//0.001;
-	double gamma = 2.;
+	size_t stRuns = 5;
+	double dPhi = 0.001; //0.000001; //0.001;
+	double gamma = 2.0;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
 	uint32_t u32Granularity = 8;
-	std::string file = "../trace/equinix-sanjose.dmp";
+	std::string file = "../trace/nyc.dmp";
 	bool timeLaspe = false;
 	double dSkew = 1.0;
 
@@ -243,8 +241,7 @@ int main(int argc, char **argv)
 		if (strcmp(argv[i], "-np") == 0)
 		{
 			i++;
-			if (i >= argc)
-			{
+			if (i >= argc) {
 				std::cerr << "Missing number of packets." << std::endl;
 				return -1;
 			}
@@ -253,8 +250,7 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "-r") == 0)
 		{
 			i++;
-			if (i >= argc)
-			{
+			if (i >= argc) {
 				std::cerr << "Missing number of runs." << std::endl;
 				return -1;
 			}
@@ -263,15 +259,13 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "-d") == 0)
 		{
 			i++;
-			if (i >= argc)
-			{
+			if (i >= argc) {
 				std::cerr << "Missing depth." << std::endl;
 				return -1;
 			}
 			u32Depth = atoi(argv[i]);
 		}
-		else if (strcmp(argv[i], "-g") == 0)
-		{
+		else if (strcmp(argv[i], "-g") == 0) {
 			i++;
 			if (i >= argc)
 			{
@@ -293,8 +287,7 @@ int main(int argc, char **argv)
 		else if (strcmp(argv[i], "-f") == 0)
 		{
 			i++;
-			if (i >= argc)
-			{
+			if (i >= argc) {
 				std::cerr << "Missing file name." << std::endl;
 				return -1;
 			}
@@ -411,11 +404,13 @@ int main(int argc, char **argv)
 	CM_type* cm = CM_Init(u32Width, u32Depth, 0);
 	
 	// Number of runs to complete one pass through our trace. 
-	const size_t MAX_TRACE_SIZE = 100000;
+	const size_t MAX_TRACE_SIZE = 1000000000;
 	size_t experimentSize = data.size() > MAX_TRACE_SIZE ? MAX_TRACE_SIZE : data.size();
 	size_t stRunSize = experimentSize / stRuns;
-	std::cout << "Total Number of Packets in Trace: " << data.size() << std::endl;
-	std::cout << "Number of packets in each run: " << stRunSize << std::endl;
+	if (VERBOSE_EXACT) {
+		std::cout << "Total Number of Packets in Trace: " << data.size() << std::endl;
+		std::cout << "Number of packets in each run: " << stRunSize << std::endl;
+	}
 	size_t stStreamPos = 0;
 	long long total = 0;
 
@@ -443,8 +438,6 @@ int main(int argc, char **argv)
 			ALS_Update(als, data[i], values[i]);
 		}
 		SALS.dU += t = StopTheClock(start);
-		std::cout << "Number of packets processed" << stRunSize << std::endl;
-		std::cout << "Time for this step" << t << std::endl;
 		TALS.push_back(t);
 		
 		start = Clock::now();
@@ -455,15 +448,14 @@ int main(int argc, char **argv)
 		TCM.push_back(t);
 
 		uint64_t thresh = static_cast<uint64_t>(floor(dPhi * total)+1);//floor(dPhi * run * stRunSize));
-		std::cerr << "total " << total << " thresh " << thresh << std::endl;
+		if (VERBOSE_EXACT) std::cerr << "total " << total << " thresh " << thresh << std::endl;
 		size_t hh = RunExact(thresh, exact);
-		std::cerr << "Run: " << run << ", Exact: " << hh << std::endl;
+		if (VERBOSE_EXACT) std::cerr << "Run: " << run << ", Exact: " << hh << std::endl;
 
 		std::map<uint32_t, uint32_t> res;
 		
 		start = Clock::now();
 		res = ALS_Output(als, thresh);
-		std::cout << "Found this many above thresh: " << res.size() << std::endl;
 		SLS.dQ += StopTheClock(start);
 		CheckOutput(res, thresh, hh, SALS, exact);
 		
