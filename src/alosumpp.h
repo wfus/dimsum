@@ -14,7 +14,7 @@
 #define GAMMA 1.0
 #define ALS_HASHMULT 3  // how big to make the hashtable of elements:
 #ifdef ALS_SIZE
-#define ALS_SPACE (ALS_HASHMULT*ALS_SIZE)
+#define ALS_SPACE (ALS_HASHMULT * ALS_SIZE)
 #endif
 
 typedef struct ALScounter_t ALSCounter;
@@ -31,12 +31,12 @@ class ALS {
 	int countersize, maxMaintenanceTime;
 	int nActive, nPassive, extra, movedFromPassive;
 	int* buffer;
-	int quantile;
-	float epsilon;
-	float gamma;
+	int quantile;  // error term representing count uncertainty
+	float epsilon;  // Use 1/epsilon base space for each hashtable - gives guarantees
+	float gamma;  // amount of extra space used more than 1/epsilon
 	void* handle;
-	ALSCounter* activeCounters;
-	ALSCounter* passiveCounters;
+	ALSCounter* activeCounters;  // Counters inside our active hashtable
+	ALSCounter* passiveCounters;  // Counters inside our passive hashtable
 	ALSCounter** activeHashtable; // array of pointers to items in 'counters'
 	ALSCounter** passiveHashtable; // array of pointers to items in 'counters'
 
@@ -45,21 +45,21 @@ public:
     ~ALS();
     void update();
     int size();
-    int point_est();
+    int point_est(ALSitem_t);
     int point_err();
-    void check_hash();
     std::map<uint32_t, uint32_t> output(uint64_t);
     int in_place_find_kth(int*, int, int, int, int);
-
-    // debugging functions
-    void show_hash();
-    void show_heap();
 
     // query functions
     ALSCounter* find_item(ALSitem_t);
 
     // modification
     void add_item(ALSitem_t, ALSweight_t);
+    
+    // debugging functions
+    void show_hash();
+    void show_heap();
+    void check_hash(int, int);
 
 private:
     void init_passive();

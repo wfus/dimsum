@@ -10,6 +10,7 @@ Last modified: December 2016
 
 // #include "losum.h"
 #include "alosum.h"
+// #include "alosumpp.h"
 #include <fstream>
 #include <chrono>
 #include <thread>
@@ -145,6 +146,7 @@ void PrintTimes(std::string title, std::vector<uint64_t> times) {
 	std::cout << std::endl;
 }
 
+
 /**
  * Pretty prints our statistics class.
  */
@@ -223,13 +225,13 @@ int main(int argc, char **argv)
 {
 	// algorithm and data parameters 
 	size_t stNumberOfPackets = 10000000;
-	size_t stRuns = 5;
-	double dPhi = 0.001;//0.000001;//0.001;
-	double gamma = 4.;
+	size_t stRuns = 100;
+	double dPhi = 0.001; //0.000001;//0.001;
+	double gamma = 2.;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
 	uint32_t u32Granularity = 8;
-	std::string file = "../trace/generated_data";
+	std::string file = "../trace/equinix-sanjose.dmp";
 	bool timeLaspe = false;
 	double dSkew = 1.0;
 
@@ -321,9 +323,9 @@ int main(int argc, char **argv)
 			dSkew = atof(argv[i]);
 		}
 		else if (strcmp(argv[i], "-measure_time_granularity") == 0) {
-			uint64_t t;
+			uint64_t start_time = 0;
 			auto start = Clock::now();
-			while (t == 0) {
+			while (start_time == 0) {
 				t = StopTheClock(start);
 			}
 			std::cout << "Time granularity is " << t << " ms" << std::endl;
@@ -363,7 +365,7 @@ int main(int argc, char **argv)
 			std::cout << "Unable to load file" << std::endl;
 			exit(1);
 		}
-		int id, length;
+		uint32_t id, length;
 		while (f >> id >> length) {
 			// std::cout << id << " " << length << std::endl;
 			if (length <= 0) continue; // Packets should not be empty!
@@ -371,7 +373,7 @@ int main(int argc, char **argv)
 				std::cerr << "Why is total negative? " << total<<std::endl;
 				break;
 			}
-			if ((total + abs(length)) >= 0x7FFFFFFE) {
+			if ((total + length) >= 0x7FFFFFFE) {
 				std::cerr <<  "Error! total number of bytes is " << total << " and trying to add " << length << std::endl;
 				break;
 			}
@@ -410,6 +412,8 @@ int main(int argc, char **argv)
 	
 	// Number of runs to complete one pass through our trace. 
 	size_t stRunSize = data.size() / stRuns;
+	std::cout << "Total Number of Packets in Trace: " << data.size() << std::endl;
+	std::cout << "Number of packets in each run: " << stRunSize << std::endl;
 	size_t stStreamPos = 0;
 	long long total = 0;
 
@@ -437,6 +441,8 @@ int main(int argc, char **argv)
 			ALS_Update(als, data[i], values[i]);
 		}
 		SALS.dU += t = StopTheClock(start);
+		std::cout << "Number of packets processed" << stRunSize << std::endl;
+		std::cout << "Time for this step" << t << std::endl;
 		TALS.push_back(t);
 		
 		start = Clock::now();
@@ -446,7 +452,7 @@ int main(int argc, char **argv)
 		SCM.dU += t = StopTheClock(start);
 		TCM.push_back(t);
 
-		uint64_t thresh = static_cast<uint64_t>(floor(dPhi*total)+1);//floor(dPhi * run * stRunSize));
+		uint64_t thresh = static_cast<uint64_t>(floor(dPhi * total)+1);//floor(dPhi * run * stRunSize));
 		std::cerr << "total " << total << " thresh " << thresh << std::endl;
 		size_t hh = RunExact(thresh, exact);
 		std::cerr << "Run: " << run << ", Exact: " << hh << std::endl;
@@ -455,6 +461,7 @@ int main(int argc, char **argv)
 		
 		start = Clock::now();
 		res = ALS_Output(als, thresh);
+		std::cout << "Found this many above thresh: " << res.size() << std::endl;
 		SLS.dQ += StopTheClock(start);
 		CheckOutput(res, thresh, hh, SALS, exact);
 		

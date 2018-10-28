@@ -83,22 +83,32 @@ void ALS::destroy_passive() {
     free(passiveCounters);
 }
 
+/**
+ * Returns the size of ALL datastructures used, including on heap.
+ */
 int ALS::size() {
     return sizeof(ALS) + countersize * sizeof(int)    // size of median buffer
 		+ 2 * (hashsize * sizeof(ALSCounter*))        // two hash tables
 		+ 2 * (countersize * sizeof(ALSCounter));     // two counter arrays
 };
 
-int ALS::point_est() {
-
+/**
+ * Estimate the count for a specific id. Returns the error term
+ * if we cannot find it in our hashtables.
+ */
+int ALS::point_est(ALSitem_t item) {
+	ALSCounter* i;
+	i = find_item(item);
+	return i ? i->count : quantile;
+	// if we couldn't find the item, we provide an overestimate
+	// with our error 'quantile'
 };
 
+/**
+ * Estimate the worst case error in our threshold estimate
+ */
 int ALS::point_err() {
-
-};
-
-void ALS::check_hash() {
-
+	return quantile;
 };
 
 /**
@@ -108,6 +118,19 @@ void ALS::check_hash() {
 std::map<uint32_t, uint32_t> ALS::output(uint64_t thresh) {
 	std::map<uint32_t, uint32_t> res;
     // Iterate through active block. Then, we iterate through 
+	for (int i = 0; i < nActive; ++i) {
+		if (activeCounters[i].count >= thresh)
+			res.insert(std::pair<uint32_t, uint32_t>(activeCounters[i].item, activeCounters[i].count));
+	}
+	// If we see it in passive, maybe it was dupliced and is also in active
+	for (int i = 0; i < nPassive; ++i) {
+		if (find_item_in_active(passiveCounters[i].item) == NULL) {
+			if (passiveCounters[i].count >= thresh) {
+				res.insert(std::pair<uint32_t, uint32_t>(passiveCounters[i].item, passiveCounters[i].count));
+			}
+		}
+	}
+	return res;
 };
 
 
@@ -168,6 +191,7 @@ int ALS::in_place_find_kth(int* v, int n, int k, int jump = 1, int pivot = 0) {
 		return pivot;
 	}
 }
+
 /*
 uint32_t ALS_Maintenance(void* lpParam) {
 	// FINISH MAINTENANCE	
@@ -324,3 +348,30 @@ void ALS::show_heap() {
 	}
     std::cout << std::endl << std::endl;
 }
+
+/**
+ * Validates the hash table to make sure everything is correct
+ */
+void ALS::check_hash(int item, int hash) {
+	int i;
+	ALSCounter *hashptr, *prev;
+
+	for (i = 0; i < hashsize; i++) {
+		prev = NULL;
+		hashptr = activeHashtable[i];
+		while (hashptr) {
+			if (hashptr->hash != i) {
+				printf("\n Hash violation! hash = %d, should be %d \n",
+					hashptr->hash, i);
+				printf("after inserting item %d with hash %d\n", item, hash);
+			}
+			if (hashptr->prev != prev) {
+				printf("\n Previous violation! prev = %p, should be %p\n", hashptr->prev, prev);
+				printf("after inserting item %d with hash %d\n", item, hash);
+				exit(1);
+			}
+			prev = hashptr;
+			hashptr = hashptr->next;
+		}
+	}
+};

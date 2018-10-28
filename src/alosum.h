@@ -13,6 +13,7 @@
 
 #define ALSitem_t uint32_t
 #define GAMMA 1.0
+
 typedef struct ALScounter_t ALSCounter;
 
 struct ALScounter_t {
