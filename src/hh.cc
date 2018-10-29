@@ -223,7 +223,7 @@ size_t RunExact(uint64_t thresh, std::vector<uint32_t>& exact) {
 int main(int argc, char **argv) {
 	// algorithm and data default parameters
 	size_t stNumberOfPackets = 10000000;
-	size_t stRuns = 5;
+	size_t stRuns = 20;
 	double dPhi = 0.001; //0.000001; //0.001;
 	double gamma = 2.0;
 	bool gammaDefined = false;
