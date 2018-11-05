@@ -200,7 +200,6 @@ void DIMSUMpp::maintenance() {
 
     // First, merge any values from the small passive table into the large
     // passive table
-    /*
     DIMCounter *merge_counter;
     for (int i = 0; i < smallPassiveSize; i++) {
         DIMitem_t item = smallPassiveCounters[i].item;
@@ -222,7 +221,7 @@ void DIMSUMpp::maintenance() {
             del_counter->prev = NULL;
             del_counter->next = NULL;
         }
-    }*/
+    }
 
 
     int k = smallPassiveSize;
