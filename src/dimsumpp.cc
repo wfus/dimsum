@@ -2,10 +2,9 @@
 
 #define DIM_NULLITEM 0x7FFFFFF
 
-DIMSUM::DIMSUM(float ep, float g) {
+DIMSUMpp::DIMSUMpp(float ep, float g) {
     epsilon = ep;
     gamma = g;
-    int k = 1 + (int) 1.0 / epsilon;    
     
     // Initialize the active and passive
     nActive = 0; 
@@ -46,54 +45,57 @@ DIMSUM::DIMSUM(float ep, float g) {
     // Allocate the number of spaces to our buffer for
     // finding the topk and quantile stuff
     quantile = 0;
+
+    // Allocate all of the shared parameters used during maintenance
+    blocksLeft = 0;
+    left2move = 0;
+    all_done = false;
+    finishedMedian = false;
+    stepsLeft = 0;
+    movedFromPassive = 0;
+    clearedFromPassive = smallPassiveHashSize;
+    copied2buffer = 0;
+
+    // Make the maintenance thread and shit
+    // std::thread maintenance_thread(&DIMSUMpp::maintenance, this);
+    // maintenance_thread.detach();
 }
 
 
-DIMSUM::~DIMSUM() {
-    std::cout << "Destroying" << std::endl;
+DIMSUMpp::~DIMSUMpp() {
+    std::cout << "Destroying, taking control of all the mutexes." << std::endl;
+    maintenance_step_mutex.lock();
+    finish_update_mutex.lock();
+    std::cerr << "Took control of mutexes, destroying everying." << std::endl;
+    maintenance_step_mutex.unlock();
+    finish_update_mutex.unlock();
     destroy_passive();
     destroy_active();
 }
 
-
 /**
  * Adds an item to to our system. Can be executed while FindItem is running.
  */
-void DIMSUM::add_item(DIMitem_t item, DIMweight_t value) {
+void DIMSUMpp::add_item(DIMitem_t item, DIMweight_t value) {
 	int hashval = static_cast<int>(hash31(hasha, hashb, item) % activeHashSize);
-	DIMCounter* hashptr = activeHashtable[hashval];
-
-	// Coherence checks - we need to make sure we always have room to
-	// put in more network flows.
-	if (nActive >= activeSize) {
-		std::cerr << "Error! Not enough room in table." << std::endl;
-		std::cerr << "Size:"<< countersize << " Active: " << nActive 
-            << " LargePassive:" << nLargePassive
-            << " SmallPassive:" << nSmallPassive 
-			<< std::endl;
-	}
+	// Function should not have been called if there is not enough room in table to insert the item
+	// This applies both to if it's called from maintenance thread and update.
 	assert(nActive < activeSize);
 	// put the new item into the hashtable at the beginning.
 	DIMCounter* counter = &(activeCounters[nActive]);
     nActive++;
-	// slot new item into hashtable
+    // slot new item into hashtable
 	// counter goes to the beginning of the list.
-	// The current head of the list becomes the second item in the list.
-	counter->next = hashptr;
-	// If the list was not empty, 
-	if (hashptr)
-		// point the second item's previous item to the new counter.
-		hashptr->prev = counter;
-	// Now put the counter as the new head of the list.
-	activeHashtable[hashval] = counter;
-	// The head of the list has no previous item
-	counter->prev = NULL;
 	// save the current item
 	counter->item = item;
 	// save the current hash
-	counter->hash = hashval; 
-	// update the upper bound on the items frequency
-	counter->count = value; 	
+	counter->count = value;
+	// If we add another item to the same chain we could have a problem here.
+	DIMCounter* hashptr = activeHashtable[hashval];
+	// The current head of the list becomes the second item in the list.
+	counter->next = hashptr;
+	// Now put the counter as the new head of the list.
+	activeHashtable[hashval] = counter;
 }
 
 
@@ -101,28 +103,85 @@ void DIMSUM::add_item(DIMitem_t item, DIMweight_t value) {
  * Returns the size of ALL datastructures used, including the stuff
  * allocated onto the heap.
  */
-int DIMSUM::size() {
+int DIMSUMpp::size() {
     // TODO:
     return 0;
 }
 
+/*************************************************************************
+ * MAINTENANCE THREAD STUFF 
+ * Might not have to do maintenance for DIMSUM++ just yet.
+ *************************************************************************/
+/*
+int DIMSUMpp::maintenance() {
+    // We want to run the maintenance thread forever, but only try doing the
+    // maintenance if we can acquire the lock in some way.
+    for (;;) {
+        maintenance_step_mutex.lock();
+        std::cerr << "In maintenance right now!" << std::endl;
+        if (all_done) {
+            std::cerr << "Object getting destroyed... goodbye from maintenance thread!";
+            std::cerr << std::endl;
+            return 0;
+        }
+        std::cerr << "Trying to getting out of maintenance..." << std::endl;
+        finish_update_mutex.unlock();
+        std::cerr << "Got out of maintenance." << std::endl;
+    }
+    return 0;
+}
+*/
+
 
 /*************************************************************************
- * INTERNAL QUERYING 
+ * INTERNAL UPDATING 
  *************************************************************************/
 /**
- * Returns a list of items and counts that are greater than a certain threshold.
+ * Adds an item to a specified location in our hash table. Can be executed
+ * when find_item or add_item is still running.
+ * Only adds the item to the active table.
  */
-std::map<uint32_t, uint32_t> DIMSUM::output(uint64_t thresh) {
-    std::map<uint32_t, uint32_t> res;
-    //TODO: Implement this.
-    return res;
+/*
+void DIMSUMpp::add_item_to_location(DIMitem_t item, DIMweight_t value, DIMCounter** location) {
+    // Function should not have been called if there is not enough room in table to insert the item
+	// This applies both to if it's called from maintenance thread and update.
+	assert(nActive < activeSize);
+	DIMCounter* counter = &(activeCounters[nActive]);
+    nActive++;
+	// slot new item into hashtable
+	// counter goes to the beginning of the list.
+	// save the current item
+	counter->item = item;
+	// save the current hash
+	counter->count = value;
+	// If we add another item to the same chain we could have a problem here.
+	DIMCounter* hashptr = *location;
+	// The current head of the list becomes the second item in the list.
+	counter->next = hashptr;
+	// Now put the counter as the new head of the list.
+	*location = counter;
+}
+
+void DIMSUMpp::update(DIMitem_t item, DIMweight_t value) {
+}
+*/
+
+void DIMSUMpp::do_some_moving() {
+    // TODO
+}
+
+void DIMSUMpp::do_some_clearing() {
+    //TODO
+    int updatesLeft = activeSize - nActive;
+    assert(movedFromPassive == nSmallPassive);
+	assert(left2move == 0);
+	assert(updatesLeft >= 0);
 }
 
 /*************************************************************************
  * INTERNAL QUERYING 
  *************************************************************************/
-DIMCounter* DIMSUM::find_item(DIMitem_t item) {
+DIMCounter* DIMSUMpp::find_item(DIMitem_t item) {
 	DIMCounter* hashptr;
 	hashptr = find_item_in_active(item);
 	if (!hashptr) {
@@ -131,7 +190,7 @@ DIMCounter* DIMSUM::find_item(DIMitem_t item) {
 	return hashptr;
 }
 
-DIMCounter* DIMSUM::find_item_in_active(DIMitem_t item) {
+DIMCounter* DIMSUMpp::find_item_in_active(DIMitem_t item) {
 	DIMCounter* hashptr;
 	int hashval;
 	hashval = static_cast<int>(hash31(hasha, hashb, item) % activeHashSize);
@@ -144,7 +203,7 @@ DIMCounter* DIMSUM::find_item_in_active(DIMitem_t item) {
 	return hashptr;
 }
 
-DIMCounter* DIMSUM::find_item_in_passive(DIMitem_t item) {
+DIMCounter* DIMSUMpp::find_item_in_passive(DIMitem_t item) {
 	DIMCounter* hashptr;
 	int hashval;
 	hashval = static_cast<int>(hash31(hasha, hashb, item) % largePassiveHashSize);
@@ -160,24 +219,61 @@ DIMCounter* DIMSUM::find_item_in_passive(DIMitem_t item) {
 	return hashptr;
 }
 
+
+/*************************************************************************
+ * QUERYING 
+ *************************************************************************/
+/**
+ * Returns a list of items and counts that are greater than a certain threshold.
+ */
+std::map<uint32_t, uint32_t> DIMSUMpp::output(uint64_t thresh) {
+    std::map<uint32_t, uint32_t> res;
+
+    for (int i = 0; i < nActive; i++) {
+        if (activeCounters[i].count >= thresh) {
+            res.insert(std::pair<uint32_t, uint32_t>(activeCounters[i].item, activeCounters[i].count));
+        }
+    }
+    for (int i = 0; i < nLargePassive; i++) {
+        // See if something is in the passive table and not in the active.
+        if (find_item_in_active(largePassiveCounters[i].item) == NULL
+            && largePassiveCounters[i].count >= thresh) {
+            res.insert(std::pair<uint32_t, uint32_t>(
+				largePassiveCounters[i].item, largePassiveCounters[i].count));
+        }
+    }
+    // TODO: Have to scan through the small passive table
+    return res;
+}
+
+DIMweight_t DIMSUMpp::point_err() {
+    return quantile;
+}
+
+DIMweight_t DIMSUMpp::point_est(DIMitem_t item) {
+    DIMCounter* a;
+    a = find_item(item);
+    return a ? a->count : quantile;
+}
+
 /*************************************************************************
  * DEBUGGING (I enjoy debugging in a very deep level.)
  *************************************************************************/
-void DIMSUM::show_large_passive_table() {
+void DIMSUMpp::show_large_passive_table() {
     for (int i = 0; i < largePassiveSize; i++) {
         std::cout << "|" << largePassiveCounters[i].count;
     }
     std::cout << "|" << std::endl;
 }
 
-void DIMSUM::show_small_passive_table() {
+void DIMSUMpp::show_small_passive_table() {
     for (int i = 0; i < smallPassiveSize; i++) {
         std::cout << "|" << smallPassiveCounters[i].count;
     }
     std::cout << "|" << std::endl;
 }
 
-void DIMSUM::show_passive_table() {
+void DIMSUMpp::show_passive_table() {
     std::cout << "LARGE PASSIVE TABLE" << std::endl;
     show_large_passive_table();
     std::cout << "SMALL PASSIVE TABLE" << std::endl;
@@ -185,14 +281,14 @@ void DIMSUM::show_passive_table() {
     std::cout << std::endl;
 }
 
-void DIMSUM::show_active_table() {
+void DIMSUMpp::show_active_table() {
     for (int i = 0; i < activeSize; i++) {
         std::cout << "|" << activeCounters[i].count;
     }
     std::cout << "|" << std::endl;
 }
 
-void DIMSUM::show_table() {
+void DIMSUMpp::show_table() {
     std::cout << "LARGE PASSIVE TABLE" << std::endl;
     show_large_passive_table();
     std::cout << "SMALL PASSIVE TABLE" << std::endl;
@@ -204,7 +300,7 @@ void DIMSUM::show_table() {
 /*************************************************************************
  * Helper Allocation and Deallocation functions 
  *************************************************************************/
-void DIMSUM::init_passive() {
+void DIMSUMpp::init_passive() {
     // Allocate the large hash table. 
     largePassiveHashSize = DIM_HASHMULT * largePassiveSize;
     largePassiveCounters = (DIMCounter *) calloc(largePassiveSize, sizeof(DIMCounter));
@@ -235,14 +331,14 @@ void DIMSUM::init_passive() {
 	nSmallPassive = 0;
 }
 
-void DIMSUM::destroy_passive() {
+void DIMSUMpp::destroy_passive() {
     free(smallPassiveHashtable);
     free(smallPassiveCounters);
     free(largePassiveHashtable);
     free(largePassiveCounters);
 }
 
-void DIMSUM::init_active() {
+void DIMSUMpp::init_active() {
     // Allocate the large hash table. 
     activeHashSize = DIM_HASHMULT * activeSize;
     activeCounters = (DIMCounter *) calloc(activeSize, sizeof(DIMCounter));
@@ -259,7 +355,7 @@ void DIMSUM::init_active() {
     nActive = 0;
 }
 
-void DIMSUM::destroy_active() {
+void DIMSUMpp::destroy_active() {
     free(activeCounters);
     free(activeHashtable);
 }

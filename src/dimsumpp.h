@@ -4,6 +4,9 @@
  * uses half the space of the regular DIM-SUM algorithm.
  */
 #include "prng.h"
+#include <mutex>
+#include <thread>
+
 #define DIMweight_t int
 #define DIMitem_t uint32_t
 #define GAMMA 1.0
@@ -21,47 +24,83 @@ struct DIMcounter_t {
 };
 
 
-class DIMSUM {
+class DIMSUMpp {
+
+    DIMweight_t n;
 
     int hasha, hashb, hashsize;
     int countersize, maxMaintenanceTime;
-    int nActive, nPassive, extra, movedFromPassive;
+    int nActive, nSmallPassive, nLargePassive, extra;
 
     int* buffer;
-    int quantile;
+    DIMweight_t quantile;
     float epsilon;
     float gamma;
     void* handle;
 
+    int largePassiveSize, smallPassiveSize, activeSize;
+    int activeHashSize, smallPassiveHashSize, largePassiveHashSize;
+
     DIMCounter* activeCounters;
-    DIMCounter* passiveCounters;
+    DIMCounter* smallPassiveCounters;
+    DIMCounter* largePassiveCounters;
     DIMCounter** activeHashtable;
-    DIMCounter** passiveHashtable;
+    DIMCounter** largePassiveHashtable;
+    DIMCounter** smallPassiveHashtable;
+    
+    // locks for maintenance steps
+    std::mutex maintenance_step_mutex, finish_update_mutex;
+    int left2move;
+    int blocksLeft;
+    bool finishedMedian;
+    int stepsLeft;
+    int movedFromPassive;
+    int clearedFromPassive;
+    int copied2buffer;
+
+
+    // cleanup code for maintenance
+    bool all_done;
 
 public:
-    DIMSUM(float, float);
-    ~DIMSUM();
+    DIMSUMpp(float, float);
+    ~DIMSUMpp();
     void update(DIMitem_t, DIMweight_t);
     int size();
-    int point_est(DIMitem_t);
-    int point_err();
     std::map<uint32_t, uint32_t> output(uint64_t);
-    int in_place_find_kth(int*, int, int, int, int);
 
     // query functions
     DIMCounter* find_item(DIMitem_t);
 
     // what the user calls 
     void add_item(DIMitem_t, DIMweight_t);
+    DIMweight_t point_est(DIMitem_t);
+    DIMweight_t point_err();
 
     // debugging for days
     void show_hash();
     void show_heap();
     void check_hash(int, int);
-
+    void show_active_table();
+    void show_large_passive_table();
+    void show_small_passive_table();
+    void show_passive_table();
+    void show_table();
+    
 private:
     void init_passive();
     void destroy_passive();
+    void init_active();
+    void destroy_active();
+    
+    // maintenance threads stuff
+    int maintenance();
+    void do_some_clearing();
+    void do_some_moving();
+
+    // internal editing functions for adding/updating
+    void add_item_to_location(DIMitem_t, DIMweight_t, DIMCounter**);
+    int in_place_find_kth(int*, int, int, int, int);
 
     // internal query functions
     DIMCounter* find_item_in_active(DIMitem_t);
