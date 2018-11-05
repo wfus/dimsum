@@ -86,7 +86,6 @@ DIMSUMpp::~DIMSUMpp() {
  * Update function for our system. User should be calling this function.
  */
 void DIMSUMpp::update(DIMitem_t item, DIMweight_t value) {
-    int hashval;
 	DIMCounter* hashptr;
 	// find whether new item is already stored, if so store it and add one
 	// update heap property if necessary
@@ -126,8 +125,6 @@ void DIMSUMpp::update(DIMitem_t item, DIMweight_t value) {
 void DIMSUMpp::add_item(DIMitem_t item, DIMweight_t value) {
     int hashval = (int)hash31(hasha, hashb, item) % activeHashSize;
 	DIMCounter* hashptr = activeHashtable[hashval];
-	// so, overwrite smallest heap item and reheapify if necessary
-	// fix up linked list from hashtable
 	if (nActive >= activeSize) {
 		std::cerr << "Error! Not enough room in table."<<std::endl;
 		std::cerr << "Size:"<<activeSize << " Active: " << nActive 
@@ -166,8 +163,13 @@ void DIMSUMpp::add_item(DIMitem_t item, DIMweight_t value) {
  * allocated onto the heap.
  */
 int DIMSUMpp::size() {
-    // TODO:
-    return 0;
+    return sizeof(DIMSUMpp) // size of data structure
+        // size of the kth top buffer
+        + (smallPassiveSize + largePassiveSize) * sizeof(int)
+        // all of the hash tables that we used.
+        + (largePassiveHashSize + smallPassiveHashSize + activeHashSize) * sizeof(DIMCounter*)
+        // counter arrays that we used
+        + (smallPassiveSize + largePassiveSize + activeSize) * sizeof(DIMCounter);
 }
 
 /*************************************************************************
@@ -175,37 +177,57 @@ int DIMSUMpp::size() {
  * Might not have to do maintenance for DIMSUM++ just yet.
  *************************************************************************/
 void DIMSUMpp::restart_maintenance() {
+    #if DIM_DEBUG
     std::cerr << "Starting the maintenance..." << std::endl;
+    #endif
     // switch the active counter and the small passive counter
-    DIMCounter* tmp = activeCounters;
-    activeCounters = smallPassiveCounters;
-    smallPassiveCounters = tmp;
-
-    // switch the number of active counter and passive counter
-    int t = nActive;
-    nActive = nSmallPassive;
-    nSmallPassive = nActive;
-
-    // switch the actual hashtables
-    DIMCounter** tmpTable = activeHashtable;
-    activeHashtable = smallPassiveHashtable;
-    smallPassiveHashtable = tmpTable;
-
-    // Update the number of extra updates we have until another maintainace
-    // is required
-    // TODO: maybe this is wrong calculation of extra?
-    extra = activeSize - nActive;
-    movedFromPassive = 0;
-    assert(extra >= 0);
+    std::swap(activeCounters, smallPassiveCounters);
+    std::swap(nActive, nSmallPassive);
+    std::swap(activeHashtable, smallPassiveHashtable);
+    // After this process is done and we have updated our quantile, we can
+    // feel free to run rampant and erase the things in our active site.
+    extra = activeSize;
+    nActive = 0;
+    destroy_active();
+    init_active();
     
+    assert(extra >= 0);
     // call the real maintenance that we need once we have swapped the tables.
     maintenance();
 }
 
 void DIMSUMpp::maintenance() {
+
+    // First, merge any values from the small passive table into the large
+    // passive table
+    /*
+    DIMCounter *merge_counter;
+    for (int i = 0; i < smallPassiveSize; i++) {
+        DIMitem_t item = smallPassiveCounters[i].item;
+        DIMweight_t val = smallPassiveCounters[i].count;
+        merge_counter = find_item_in_passive(item);
+        if (merge_counter) {
+            // MERGE AND DELETE!
+            merge_counter->count += val;
+
+            DIMCounter* del_counter = &smallPassiveCounters[i];
+            if (smallPassiveHashtable[del_counter->hash]->item == del_counter->item) {
+                smallPassiveHashtable[del_counter->hash] = del_counter->next; 
+            } 
+            if (del_counter->prev) (del_counter->prev)->next = del_counter->next;
+            if (del_counter->next) (del_counter->next)->prev = del_counter->prev;
+
+            del_counter->count = 0;
+            del_counter->item = DIM_NULLITEM;
+            del_counter->prev = NULL;
+            del_counter->next = NULL;
+        }
+    }*/
+
+
     int k = smallPassiveSize;
     if (k >= 0) {
-        // copy the large buffer, then the small buffer, in sequence.
+        // copy the smaller buffer, then the large buffer in sequence 
         
         for (int i = 0; i < smallPassiveSize; i++) {
             buffer[i] = smallPassiveCounters[i].count;
@@ -214,11 +236,11 @@ void DIMSUMpp::maintenance() {
             buffer[smallPassiveSize + i] = largePassiveCounters[i].count; 
         }
         int median = in_place_find_kth(buffer, largePassiveSize + smallPassiveSize, k, 1, quantile+1);
-        std::cout << "top kth: " << median << std::endl;
         quantile = std::max(median, quantile); 
     }
-    std::cout << "Quantile: " << quantile << std::endl;
-
+    #if DIM_DEBUG
+        std::cout << "Quantile: " << quantile << std::endl;
+    #endif
     // copy from passive to SUPER passive. Since we already have the quantile,
     // we can swap out all elements that are below or equal to the quantile into
     // the small passive. We have to do the equals case in case all the flows
@@ -247,12 +269,8 @@ void DIMSUMpp::maintenance() {
             continue;
         }
     }
-    // After this process is done and we have updated our quantile, we can
-    // feel free to run rampant and erase the things in our active site.
-    extra = activeSize;
-    nActive = 0;
-    destroy_active();
-    init_active();
+    
+
 }
 
 /*
@@ -285,22 +303,19 @@ int DIMSUMpp::maintenance() {
  * store in the counters and also swap some records in their hashtables.
  */
 void DIMSUMpp::swap_small_large_passive(int i, int j) {
-    assert(i < smallPassiveSize);
-    assert(j < largePassiveSize);
 
     DIMCounter *counteri = &smallPassiveCounters[i];
     DIMCounter *counterj = &largePassiveCounters[j];
+        
+    #if DIM_DEBUG 
+    assert(i < smallPassiveSize);
+    assert(j < largePassiveSize);
 
-    // Find the counters that actually match smallPassiveCounters[i] and
-    // largePassiveCounters[j]
-    if (counteri->item == DIM_NULLITEM && counterj->item == DIM_NULLITEM) {
-        std::cerr << "Both swapped counters were uninitialized, this prolly shudn't happen "
-            << std::endl;
-        return;
-    }
+    assert(counteri != NULL);
+    assert(counterj != NULL);
+    assert(counteri->item != DIM_NULLITEM || counterj->item != DIM_NULLITEM);
+    #endif
 
-    // Case where both the counters actually contain something, this will
-    // take much more work to do.
     if (counteri->item != DIM_NULLITEM && counterj->item != DIM_NULLITEM) {
         // std::cerr << "Swapping when both are not null" << std::endl;
         // We want to remove both of these from the hashtable. We just have
@@ -308,90 +323,142 @@ void DIMSUMpp::swap_small_large_passive(int i, int j) {
         int hashi = counteri->hash;
         int hashj = counterj->hash;
 
+        #if DIM_DEBUG
+        assert(hashi == ((int) hash31(hasha, hashb, counteri->item) % smallPassiveHashSize));
+        assert(hashj == ((int) hash31(hasha, hashb, counterj->item) % largePassiveHashSize));
+        
+        assert(hashi >= 0);
+        assert(hashj >= 0);
+        assert(hashi < smallPassiveHashSize);
+        assert(hashj < largePassiveHashSize);
+        #endif
+
         // remove the counter stuff from the linked list. The counters still
         // retain their own values.
         // if it was the head, then make the new head the next value. Otherwise,
         // we can just remove from the middle of the linked list.
-        if (smallPassiveHashtable[hashi]->item == counteri->item) {
-            smallPassiveHashtable[hashi] = counteri->next;
-        } else {
-            // it must have come from the middle if the first one wasnt it.
-            // We can simply do the regular linked list deletion.
-            (counteri->prev)->next = counteri->next;
+        // This can happen if we have an entry in the counters that doesn't
+        // have a cooresponding entry in the hashtable.
+        if (smallPassiveHashtable[hashi] == NULL ) {
+            // TODO: THIS SHOULD NEVER BE CALLEED
+            #if DIM_DEBUG
+            std::cerr << "The hash is screewed up: small" << std::endl;
+            show_table();
+            #endif
+            return;
+        }
+        if (largePassiveHashtable[hashj] == NULL) {
+            // std::cerr << "The hash is screewed up: large" << std::endl;
+            // TODO: THIS SHOULD NEVER BE CALLED
+            #if DIM_DEBUG
+                std::cerr << "Trying to switch " << i << " and " << j << std::endl;
+                std::cerr << "Trying to switch ids " << counteri->item << " and " << counterj->item << std::endl;
+                std::cerr << "orignal hashes " << counteri->hash << " and " << counterj->hash << std::endl;
+                show_table();
+                show_hash();
+            #endif
+            return;
         }
 
-        if (largePassiveHashtable[hashj] ->item == counterj->item) {
-            largePassiveHashtable[hashj] = counterj->next;
-        } else {
-            (counterj->prev)->next = counterj->next;
+        // standard linked list deletion.
+        if (smallPassiveHashtable[hashi]->item == counteri->item) {
+            smallPassiveHashtable[hashi] = counteri->next; 
         } 
+        if (counteri->prev) (counteri->prev)->next = counteri->next;
+        if (counteri->next) (counteri->next)->prev = counteri->prev;
+                
+        if (largePassiveHashtable[hashj]->item == counterj->item) {
+            largePassiveHashtable[hashj] = counterj->next;
+        }
+        if (counterj->prev) {(counterj->prev)->next = counterj->next;}
+        if (counterj->next) {(counterj->next)->prev = counterj->prev;}
+
+
         counteri->prev = NULL;
         counteri->next = NULL;
         counterj->prev = NULL;
         counterj->next = NULL;
 
         // swap the values for this.
-        std::swap(counteri->hash, counterj->hash);
         std::swap(counteri->item, counterj->item);
         std::swap(counteri->count, counterj->count);
+        counteri->hash = (int)hash31(hasha, hashb, counteri->item) % smallPassiveHashSize;
+        counterj->hash = (int)hash31(hasha, hashb, counterj->item) % largePassiveHashSize;
 
         // Add these things back into your hashmap bruh
         // counteri is still in small passive table
         // counterj is still in large passive table
         // however, hash values are different now!
-        if (smallPassiveHashtable[counteri->hash]) {
-            smallPassiveHashtable[counteri->hash]->prev = counteri;
+        if (smallPassiveHashtable[counteri->hash] != NULL) {
+            counteri->next = smallPassiveHashtable[counteri->hash];
+            counteri->next->prev = counteri;
         }
         smallPassiveHashtable[counteri->hash] = counteri;
         counteri->prev = NULL;
         
-        if (largePassiveHashtable[counterj->hash]) {
-            largePassiveHashtable[counterj->hash]->prev = counterj;
+        if (largePassiveHashtable[counterj->hash] != NULL) {
+            counterj->next = largePassiveHashtable[counterj->hash];
+            counterj->next->prev = counterj;
         }
         largePassiveHashtable[counterj->hash] = counterj;
         counterj->prev = NULL;
-        return;
-    }
-
-    if (counteri->item == DIM_NULLITEM) {
-        std::cerr << "This probably shouldn't happen normally..." << std::endl;
-        assert(false);
-        return;
-    }
-
-    if (counterj->item == DIM_NULLITEM) {
-        // std::cerr << "Swapping small passive with empty large passive " << std::endl;
-        // Counteri is not null but counterj is NULL.
-        // clear out the entry from the hashtable for counteri
-        if (counteri->prev) {
-            (counteri->prev)->next = counteri->next;
-        } else {
-            smallPassiveHashtable[counteri->hash] = counteri->next;
+        
+        
+        #if DIM_DEBUG
+            if (!check_hash()) {
+                std::cerr << "Was swappin " << i << " with " << j << std::endl;
+                std::cerr << "old hashes were" << hashi
+                          << " and " << hashj << std::endl;
+                std::cerr << "new hashes were" << counteri->hash 
+                          << " and " << counterj->hash << std::endl;
+                std::cerr << "ids were" << counteri->item 
+                          << " and " << counterj->item << std::endl;
+                std::cerr << "MAJOR HASH ERROR WHEN MOVING i TO j" << std::endl;
+                show_hash();
+                show_table();
+                exit(1);
+            }
         }
+        #endif
+    } 
+    else if (counterj->item == DIM_NULLITEM) {
+        // delete item from linked list
+        if (smallPassiveHashtable[counteri->hash]->item == counteri->item) {
+            smallPassiveHashtable[counteri->hash] = counteri->next; 
+        } 
+        if (counteri->prev) (counteri->prev)->next = counteri->next;
+        if (counteri->next) (counteri->next)->prev = counteri->prev;
+
         counteri->prev = NULL;
         counteri->next = NULL;
         counterj->prev = NULL;
         counterj->next = NULL;
         
-        std::cout << "BEFORE SWAP" << std::endl;
-        std::cout << counteri->hash << " " << counteri->item << " " << counteri->count << std::endl; 
-        std::cout << counterj->hash << " " << counterj->item << " " << counterj->count << std::endl; 
         // swap i and j's info.
         std::swap(counteri->hash, counterj->hash);
         std::swap(counteri->item, counterj->item);
         std::swap(counteri->count, counterj->count);
-        std::cout << "AFTER SWAP" << std::endl;
-        std::cout << counteri->hash << " " << counteri->item << " " << counteri->count << std::endl; 
-        std::cout << counterj->hash << " " << counterj->item << " " << counterj->count << std::endl; 
+        counterj->hash = (int)hash31(hasha, hashb, counterj->item) % largePassiveHashSize;
         
         // put j back into the hashtable
-        if (largePassiveHashtable[counterj->hash]) {
+        if (largePassiveHashtable[counterj->hash] != NULL) {
             largePassiveHashtable[counterj->hash]->prev = counterj;
         }
         largePassiveHashtable[counterj->hash] = counterj;
         counterj->prev = NULL;
-        return;        
+
+        #if DIM_DEBUG
+            if (!check_hash()) {
+                std::cerr << "MAJOR HASH ERROR WHEN MOVING i to EMPTY j" << std::endl;
+                exit(1);
+            }
+        #endif
     }
+    else {
+        std::cerr << "This probably shouldn't happen normally..." << std::endl;
+        assert(false);
+    }
+
 }
 
 /**
@@ -485,20 +552,26 @@ DIMCounter* DIMSUMpp::find_item_in_passive(DIMitem_t item) {
 std::map<uint32_t, uint32_t> DIMSUMpp::output(uint64_t thresh) {
     std::map<uint32_t, uint32_t> res;
 
-    for (int i = 0; i < nActive; i++) {
+    for (int i = 0; i < activeSize; i++) {
         if (activeCounters[i].count >= thresh) {
-            res.insert(std::pair<uint32_t, uint32_t>(activeCounters[i].item, activeCounters[i].count));
+            res.insert(std::pair<uint32_t, uint32_t>(
+                activeCounters[i].item, activeCounters[i].count));
         }
     }
-    for (int i = 0; i < nLargePassive; i++) {
+    for (int i = 0; i < largePassiveSize; i++) {
         // See if something is in the passive table and not in the active.
-        if (find_item_in_active(largePassiveCounters[i].item) == NULL
-            && largePassiveCounters[i].count >= thresh) {
+        if (largePassiveCounters[i].count >= thresh) {
             res.insert(std::pair<uint32_t, uint32_t>(
 				largePassiveCounters[i].item, largePassiveCounters[i].count));
         }
     }
-    // TODO: Have to scan through the small passive table
+    for (int i = 0; i < smallPassiveSize; i++) {
+        // See if something is in the passive table and not in the active.
+        if (smallPassiveCounters[i].count >= thresh) {
+            res.insert(std::pair<uint32_t, uint32_t>(
+				smallPassiveCounters[i].item, smallPassiveCounters[i].count));
+        }
+    }
     return res;
 }
 
@@ -583,16 +656,59 @@ int DIMSUMpp::in_place_find_kth(int* v, int n, int k, int jump = 1, int pivot = 
 /*************************************************************************
  * DEBUGGING (I enjoy debugging in a very deep level.)
  *************************************************************************/
+
+void DIMSUMpp::rebuild_hash() {
+	int i;
+	DIMCounter * pt;
+
+	for (i = 0; i < smallPassiveHashSize; i++)
+		largePassiveHashtable[i] = NULL;
+
+	for (i = 0; i < largePassiveHashSize; i++)
+		smallPassiveHashtable[i] = NULL;
+    
+	// first, reset the hash table
+	for (i = 0; i < smallPassiveSize; i++) {
+		smallPassiveCounters[i].next = NULL;
+		smallPassiveCounters[i].prev = NULL;
+	}
+	for (i = 0; i < largePassiveSize; i++) {
+		largePassiveCounters[i].next = NULL;
+		largePassiveCounters[i].prev = NULL;
+	}
+	// empty out the linked list
+	for (i = 0; i < smallPassiveSize; i++) { // for each item in the data structure
+		pt = &smallPassiveCounters[i];
+		pt->next = smallPassiveHashtable[smallPassiveCounters[i].hash];
+		if (pt->next)
+			pt->next->prev = pt;
+		smallPassiveHashtable[smallPassiveCounters[i].hash] = pt;
+	}
+	for (i = 0; i < largePassiveSize; i++) { // for each item in the data structure
+		pt = &largePassiveCounters[i];
+		pt->next = largePassiveHashtable[largePassiveCounters[i].hash];
+		if (pt->next)
+			pt->next->prev = pt;
+		largePassiveHashtable[largePassiveCounters[i].hash] = pt;
+	}
+}
+
 void DIMSUMpp::show_large_passive_table() {
     for (int i = 0; i < largePassiveSize; i++) {
-        std::cout << "|" << largePassiveCounters[i].count;
+        std::cout << " | " << largePassiveCounters[i].count << " , " << largePassiveCounters[i].item;
+        if (i % 10 == 9) {
+            std::cout << std::endl;
+        }
     }
     std::cout << "|" << std::endl;
 }
 
 void DIMSUMpp::show_small_passive_table() {
     for (int i = 0; i < smallPassiveSize; i++) {
-        std::cout << "|" << smallPassiveCounters[i].count;
+        std::cout << " | " << smallPassiveCounters[i].count << " , " << smallPassiveCounters[i].item;
+        if (i % 10 == 9) {
+            std::cout << std::endl;
+        }
     }
     std::cout << "|" << std::endl;
 }
@@ -607,7 +723,10 @@ void DIMSUMpp::show_passive_table() {
 
 void DIMSUMpp::show_active_table() {
     for (int i = 0; i < activeSize; i++) {
-        std::cout << "|" << activeCounters[i].count;
+        std::cout << " | " << activeCounters[i].count << " , " << activeCounters[i].item;
+        if (i % 10 == 9) {
+            std::cout << std::endl;
+        }
     }
     std::cout << "|" << std::endl;
 }
@@ -623,6 +742,27 @@ void DIMSUMpp::show_table() {
     std::cout << std::endl;
 }
 
+void DIMSUMpp::show_small_passive_hash() {
+    int i;
+	DIMCounter* hashptr;
+
+    std::cout << "SMALL PASSIVE HASH TABLE" << std::endl;
+	for (i = 0; i< smallPassiveHashSize; i++)
+	{
+		printf("%d:", i);
+		hashptr = smallPassiveHashtable[i];
+		while (hashptr) {
+			std::cout << " " << (size_t) hashptr << " [h(" 
+            << (unsigned int)hashptr->item << ") = "
+            << hashptr->hash  << ", prev = " 
+            << hashptr->prev << "] ---> ";
+			hashptr = hashptr->next;
+		}
+		printf(" *** \n");
+	}
+    std::cout << std::endl;
+}
+
 void DIMSUMpp::show_hash() {
     int i;
 	DIMCounter* hashptr;
@@ -634,7 +774,9 @@ void DIMSUMpp::show_hash() {
 		hashptr = smallPassiveHashtable[i];
 		while (hashptr) {
 			std::cout << " " << (size_t) hashptr << " [h(" 
-            << (unsigned int)hashptr->item << ") = ?, prev = ?] ---> ";
+            << (unsigned int)hashptr->item << ") = "
+            << hashptr->hash  << ", prev = " 
+            << hashptr->prev << "] ---> ";
 			hashptr = hashptr->next;
 		}
 		printf(" *** \n");
@@ -648,7 +790,9 @@ void DIMSUMpp::show_hash() {
 		hashptr = largePassiveHashtable[i];
 		while (hashptr) {
 			std::cout << " " << (size_t) hashptr << " [h(" 
-            << (unsigned int)hashptr->item << ") = ?, prev = ?] ---> ";
+            << (unsigned int)hashptr->item << ") = "
+            << hashptr->hash  << ", prev = " 
+            << hashptr->prev << "] ---> ";
 			hashptr = hashptr->next;
 		}
 		printf(" *** \n");
@@ -662,12 +806,60 @@ void DIMSUMpp::show_hash() {
 		hashptr = activeHashtable[i];
 		while (hashptr) {
 			std::cout << " " << (size_t) hashptr << " [h(" 
-            << (unsigned int)hashptr->item << ") = ?, prev = ?] ---> ";
+            << (unsigned int)hashptr->item << ") = "
+            << hashptr->hash  << ", prev = " 
+            << hashptr->prev << "] ---> ";
 			hashptr = hashptr->next;
 		}
 		printf(" *** \n");
 	}
     std::cout << std::endl;
+}
+
+bool DIMSUMpp::check_hash() {
+    // Validate the hash in our large and small passive table
+    DIMCounter* hashptr;
+    DIMCounter* prev;
+    for (int i = 0; i < smallPassiveHashSize; i++) {
+        prev = NULL;
+        hashptr = smallPassiveHashtable[i];
+        while (hashptr) {
+            if (hashptr->hash != i) {
+				printf("\n Hash violation! hash = %d, should be %d \n",
+					hashptr->hash, i);
+                std::cerr << "THIS HAPPENED IN SMALL PASSIVE" << i << std::endl;
+                return false;
+			}
+			if (hashptr->prev != prev) {
+                std::cout << "Previous element in LL not the previous! Bad!" << std::endl;
+                std::cerr << "THIS HAPPENED IN SMALL PASSIVE: " << i << std::endl;
+                return false;
+			}
+			prev = hashptr;
+			hashptr = hashptr->next;
+        }
+    }
+
+    for (int i = 0; i < largePassiveHashSize; i++) {
+        prev = NULL;
+        hashptr = largePassiveHashtable[i];
+        while (hashptr) {
+            if (hashptr->hash != i) {
+				printf("\n Hash violation! hash = %d, should be %d \n",
+					hashptr->hash, i);
+                std::cerr << "THIS HAPPENED IN LARGE PASSIVE" << i << std::endl;
+                return false;
+			}
+			if (hashptr->prev != prev) {
+                std::cout << "Previous element in LL not the previous! Bad!" << std::endl;
+                std::cerr << "THIS HAPPENED IN LARGE PASSIVE" << i << std::endl;
+                return false;
+			}
+			prev = hashptr;
+			hashptr = hashptr->next;
+        }
+    }
+    return true;
 }
 
 /*************************************************************************

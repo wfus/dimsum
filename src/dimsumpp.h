@@ -16,6 +16,8 @@
 #define DIM_SPACE (DIM_HASHMULT * DIM_SIZE)
 #endif
 
+#define DIM_DEBUG false 
+
 typedef struct DIMcounter_t DIMCounter;
 struct DIMcounter_t {
     DIMitem_t item; // item identifier
@@ -87,10 +89,11 @@ public:
     // debugging for days
     void show_hash();
     void show_heap();
-    void check_hash(int, int);
+    bool check_hash();
     void show_active_table();
     void show_large_passive_table();
     void show_small_passive_table();
+    void show_small_passive_hash();
     void show_passive_table();
     void show_table();
 
@@ -102,6 +105,8 @@ private:
     void destroy_passive();
     void init_active();
     void destroy_active();
+
+    void rebuild_hash();
     
     // maintenance threads stuff
     void maintenance();

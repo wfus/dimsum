@@ -226,8 +226,8 @@ int main(int argc, char **argv) {
 	// algorithm and data default parameters
 	size_t stNumberOfPackets = 10000000;
 	size_t stRuns = 20;
-	double dPhi = 0.00001; //0.000001; //0.001;
-	double gamma = 2.0;
+	double dPhi = 0.0003; //0.000001; //0.001;
+	double gamma = 1;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
 	uint32_t u32Granularity = 8;
@@ -447,7 +447,6 @@ int main(int argc, char **argv) {
 		start = Clock::now();
 		for (size_t i = stStreamPos; i < stStreamPos + stRunSize; ++i) {
 			dimsumpp.update(data[i], values[i]);
-
 		}
 		SDIMSUMpp.dU += t = StopTheClock(start);
 		TDIMSUMpp.push_back(t);
@@ -465,20 +464,20 @@ int main(int argc, char **argv) {
 		size_t hh = RunExact(thresh, exact);
 		if (VERBOSE_EXACT) std::cerr << "Run: " << run << ", Exact: " << hh << std::endl;
 
+		// Check results against brute force check of heavy hitters.
 		std::map<uint32_t, uint32_t> res;
-		
-		start = Clock::now();
 		res = ALS_Output(als, thresh);
-		SLS.dQ += StopTheClock(start);
 		CheckOutput(res, thresh, hh, SALS, exact);
-		
+		res = dimsumpp.output(thresh);
+		CheckOutput(res, thresh, hh, SDIMSUMpp, exact);
+
 		stStreamPos += stRunSize;
 	} 
 
 	printf("\nMethod\tUpdates/ms\tSpace\tRecall\t5th\t95th\tPrecis\t5th\t95th\tFreq RE\t5th\t95th\n");
 	stNumberOfPackets = data.size();
 	PrintOutput("ALS", ALS_Size(als), SALS, stNumberOfPackets);
-	PrintOutput("DIMSUMpp", 9000, SDIMSUMpp, stNumberOfPackets);
+	PrintOutput("DSpp", dimsumpp.size(), SDIMSUMpp, stNumberOfPackets);
 	PrintOutput("CM", CM_Size(cm), SCM, stNumberOfPackets);
 
 	ALS_Destroy(als);
