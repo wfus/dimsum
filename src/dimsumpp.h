@@ -6,6 +6,7 @@
 #include "prng.h"
 #include <mutex>
 #include <thread>
+#include <algorithm>
 
 #define DIMweight_t int
 #define DIMitem_t uint32_t
@@ -32,7 +33,6 @@ class DIMSUMpp {
     int countersize, maxMaintenanceTime;
     int nActive, nSmallPassive, nLargePassive, extra;
 
-    int* buffer;
     DIMweight_t quantile;
     float epsilon;
     float gamma;
@@ -40,6 +40,9 @@ class DIMSUMpp {
 
     int largePassiveSize, smallPassiveSize, activeSize;
     int activeHashSize, smallPassiveHashSize, largePassiveHashSize;
+    int movedFromPassive;
+
+    int* buffer;
 
     DIMCounter* activeCounters;
     DIMCounter* smallPassiveCounters;
@@ -67,6 +70,8 @@ class DIMSUMpp {
 public:
     DIMSUMpp(float, float);
     ~DIMSUMpp();
+
+    // User callable functions
     void update(DIMitem_t, DIMweight_t);
     int size();
     std::map<uint32_t, uint32_t> output(uint64_t);
@@ -74,7 +79,7 @@ public:
     // query functions
     DIMCounter* find_item(DIMitem_t);
 
-    // what the user calls 
+    // internal functions
     void add_item(DIMitem_t, DIMweight_t);
     DIMweight_t point_est(DIMitem_t);
     DIMweight_t point_err();
@@ -88,6 +93,9 @@ public:
     void show_small_passive_table();
     void show_passive_table();
     void show_table();
+
+    // TODO: make this private later after debuggin
+    void swap_small_large_passive(int, int);
     
 private:
     void init_passive();
@@ -96,7 +104,8 @@ private:
     void destroy_active();
     
     // maintenance threads stuff
-    int maintenance();
+    void maintenance();
+    void restart_maintenance();
     void do_some_clearing();
     void do_some_moving();
 
