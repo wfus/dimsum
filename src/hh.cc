@@ -9,6 +9,8 @@ Handles the evaluation of different
 
 #include "countmin.h"  // naive count min sketch
 
+#include "dimsumpp.h"
+
 // #include "losum.h"
 #include "alosum.h"
 #include <fstream>
@@ -224,7 +226,7 @@ int main(int argc, char **argv) {
 	// algorithm and data default parameters
 	size_t stNumberOfPackets = 10000000;
 	size_t stRuns = 20;
-	double dPhi = 0.001; //0.000001; //0.001;
+	double dPhi = 0.00001; //0.000001; //0.001;
 	double gamma = 2.0;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
@@ -339,8 +341,8 @@ int main(int argc, char **argv) {
 
 	uint32_t u32DomainSize = 1048575;
 	std::vector<uint32_t> exact(u32DomainSize + 1, 0);
-	Stats SLS, SCM ,SCMH, SCCFC, SALS, SLCL;
-	std::vector<uint64_t> TLS, TCM, TCMH, TCCFC, TALS, TLCL;
+	Stats SLS, SCM ,SCMH, SCCFC, SALS, SLCL, SDIMSUMpp;
+	std::vector<uint64_t> TLS, TCM, TCMH, TCCFC, TALS, TLCL, TDIMSUMpp;
 
 	/***************************************************************************
 	 * DATA LOADING - preload all data to remove IO element from algorithm. 
@@ -401,6 +403,7 @@ int main(int argc, char **argv) {
 	 * ALGORITHM INITIALIZATION
 	 **************************************************************************/
 	ALS_type* als = ALS_Init(dPhi, gamma);
+	DIMSUMpp dimsumpp(dPhi, gamma);
 	CM_type* cm = CM_Init(u32Width, u32Depth, 0);
 	
 	// Number of runs to complete one pass through our trace. 
@@ -436,10 +439,20 @@ int main(int argc, char **argv) {
 		start = Clock::now();
 		for (size_t i = stStreamPos; i < stStreamPos + stRunSize; ++i) {
 			ALS_Update(als, data[i], values[i]);
+
 		}
 		SALS.dU += t = StopTheClock(start);
 		TALS.push_back(t);
-		
+
+		start = Clock::now();
+		for (size_t i = stStreamPos; i < stStreamPos + stRunSize; ++i) {
+			dimsumpp.update(data[i], values[i]);
+
+		}
+		SDIMSUMpp.dU += t = StopTheClock(start);
+		TDIMSUMpp.push_back(t);
+
+
 		start = Clock::now();
 		for (size_t i = stStreamPos; i < stStreamPos + stRunSize; ++i) {
 			CM_Update(cm, data[i], values[i]);
@@ -465,6 +478,7 @@ int main(int argc, char **argv) {
 	printf("\nMethod\tUpdates/ms\tSpace\tRecall\t5th\t95th\tPrecis\t5th\t95th\tFreq RE\t5th\t95th\n");
 	stNumberOfPackets = data.size();
 	PrintOutput("ALS", ALS_Size(als), SALS, stNumberOfPackets);
+	PrintOutput("DIMSUMpp", 9000, SDIMSUMpp, stNumberOfPackets);
 	PrintOutput("CM", CM_Size(cm), SCM, stNumberOfPackets);
 
 	ALS_Destroy(als);

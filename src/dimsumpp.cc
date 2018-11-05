@@ -225,7 +225,34 @@ void DIMSUMpp::maintenance() {
     // are the same size. We are also capped out at smallPassiveSize number of
     // swaps. Therefore, we just iterate through the smallPassiveTable first
     // and swap out stuff in the big passive table.
-
+    int small = 0, large = 0, num_swaps = 0;
+    while (small < smallPassiveSize && large < largePassiveSize
+            && num_swaps < smallPassiveSize) {
+        DIMCounter* smallctr = &smallPassiveCounters[small];
+        DIMCounter* largectr = &largePassiveCounters[large];
+        if (largectr->count > quantile) {
+            // It's large enough - we don't want to swap it out.
+            large++;
+            continue;
+        }
+        if (smallctr->count <= quantile) {
+            // It's small enough - we can leave it in old passive
+            small++;
+            continue;
+        }
+        if (smallctr->count > quantile && largectr->count <= quantile) {
+            // we can swap and skip past our swap point.
+            swap_small_large_passive(small, large);
+            num_swaps++; small++; large++;
+            continue;
+        }
+    }
+    // After this process is done and we have updated our quantile, we can
+    // feel free to run rampant and erase the things in our active site.
+    extra = activeSize;
+    nActive = 0;
+    destroy_active();
+    init_active();
 }
 
 /*
@@ -275,7 +302,7 @@ void DIMSUMpp::swap_small_large_passive(int i, int j) {
     // Case where both the counters actually contain something, this will
     // take much more work to do.
     if (counteri->item != DIM_NULLITEM && counterj->item != DIM_NULLITEM) {
-        std::cerr << "Swapping when both are not null" << std::endl;
+        // std::cerr << "Swapping when both are not null" << std::endl;
         // We want to remove both of these from the hashtable. We just have
         // to be careful if it is the head of the hashtable linked list. 
         int hashi = counteri->hash;
@@ -333,7 +360,7 @@ void DIMSUMpp::swap_small_large_passive(int i, int j) {
     }
 
     if (counterj->item == DIM_NULLITEM) {
-        std::cerr << "Swapping small passive with empty large passive " << std::endl;
+        // std::cerr << "Swapping small passive with empty large passive " << std::endl;
         // Counteri is not null but counterj is NULL.
         // clear out the entry from the hashtable for counteri
         if (counteri->prev) {

@@ -13,28 +13,13 @@ int main(int argc, char** argv) {
     DIMSUMpp dimsum(0.05, 0.4);
     // dimsum.show_table();
     std::cout << "Adding things" << std::endl;
-    dimsum.update(69, 4);
-    dimsum.update(70, 5);
-    dimsum.update(71, 6);
-    dimsum.update(72, 7);
+    for (int i = 1; i < 100000; i++) {
+        dimsum.update(i + 1000, i);
+    }
+
+    std::cout << "Ehh good morning" << std::endl;
     dimsum.show_table();
 
-    dimsum.update(73, 8);
-    dimsum.update(74, 9);
-    dimsum.update(75, 10);
-    dimsum.update(76, 11);
-    dimsum.show_table();
-    dimsum.update(77, 12);
-    dimsum.show_table();
-
-    dimsum.swap_small_large_passive(1, 0);
-    dimsum.show_table();
-    dimsum.swap_small_large_passive(2, 1);
-    dimsum.show_table();
-    dimsum.swap_small_large_passive(0, 1);
-    dimsum.show_table();
-
-    //dimsum.show_hash();
 
     return 0;
 }
