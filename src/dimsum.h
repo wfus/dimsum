@@ -24,13 +24,13 @@ struct DIMcounter_t {
 };
 
 
-class DIMSUMpp {
+class DIMSUM {
 
     DIMweight_t n;
 
     int hasha, hashb, hashsize;
     int countersize, maxMaintenanceTime;
-    int nActive, nSmallPassive, nLargePassive, extra;
+    int nActive, nSmallPassive, nLargePassive, extra, movedFromPassive;
 
     int* buffer;
     DIMweight_t quantile;
@@ -49,24 +49,14 @@ class DIMSUMpp {
     DIMCounter** smallPassiveHashtable;
     
     // locks for maintenance steps
-    // will be needed for a background maintainence thread implementation
-    /*
     std::mutex maintenance_step_mutex, finish_update_mutex;
-    int left2move;
-    int blocksLeft;
-    bool finishedMedian;
-    int stepsLeft;
-    int movedFromPassive;
-    int clearedFromPassive;
-    int copied2buffer;
-    */
 
     // cleanup code for maintenance
-    // bool all_done;
+    bool all_done;
 
 public:
-    DIMSUMpp(float, float);
-    ~DIMSUMpp();
+    DIMSUM(float, float);
+    ~DIMSUM();
     void update(DIMitem_t, DIMweight_t);
     int size();
     std::map<uint32_t, uint32_t> output(uint64_t);
