@@ -17,9 +17,11 @@
 #endif
 
 #define STEPS_AT_A_TIME 1
-#define BLOCK_SIZE 1
+#define BLOCK_SIZE 4
+#define BLOCK_MULTIPLIER 24 
+// BLOCK_MULTIPLIER was originally 24 and BLOCK_SIZE was originally 1 
 
-#define DIMSUM_VERBOSE false 
+#define DIMSUM_VERBOSE false
 
 
 #ifndef DIMCounter 

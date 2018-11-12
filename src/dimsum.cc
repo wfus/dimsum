@@ -5,7 +5,6 @@
 DIMSUM::DIMSUM(float ep, float g) {
     epsilon = ep;
     gamma = g;
-    int k = 1 + (int) 1.0 / epsilon;    
     
     // Initialize the active and passive
     nActive = 0; 
@@ -17,7 +16,7 @@ DIMSUM::DIMSUM(float ep, float g) {
     activeHashSize = DIM_HASHMULT * activeSize;
     passiveHashSize = DIM_HASHMULT * passiveSize;
     // TODO: Understand this random constant lmao
-    maxMaintenanceTime = 24 * activeSize + activeHashSize + 1;
+    maxMaintenanceTime = BLOCK_MULTIPLIER * activeSize + activeHashSize + 1;
 
     // Need to decide on maintainance time for
     // rebalancing the active and passive tables
@@ -199,7 +198,7 @@ void DIMSUM::restart_maintenance() {
     nPassive = nActive;
     nActive = 0;
 
-    blocksLeft = (passiveHashSize + 24 * nPassive) / STEPS_AT_A_TIME + 1;
+    blocksLeft = (passiveHashSize + BLOCK_MULTIPLIER * nPassive) / STEPS_AT_A_TIME + 1;
 
     int tmp = nPassive;
     left2move = (int) (std::min(tmp, (int) (floor(1 / epsilon))));
@@ -248,7 +247,7 @@ void DIMSUM::do_some_copying() {
 	int updatesLeft = activeSize - nActive;
 	assert(movedFromPassive == 0);
 	assert(updatesLeft >= 0);
-	stepsLeft = (passiveHashSize + 24 * nPassive) + 1 - copied2buffer;
+	stepsLeft = (passiveHashSize + BLOCK_MULTIPLIER * nPassive) + 1 - copied2buffer;
 	int stepsLeftThisUpdate = stepsLeft / (updatesLeft + 1);
 	int k = nPassive - ceil(1 / epsilon);
 	if (k >= 0) {
@@ -265,7 +264,7 @@ void DIMSUM::do_some_copying() {
 		copied2buffer = nPassive;
 	}
 	if (copied2buffer == nPassive) {
-		blocksLeft = (passiveHashSize + 23 * nPassive) / STEPS_AT_A_TIME + 1;
+		blocksLeft = (passiveHashSize + BLOCK_MULTIPLIER * nPassive) / STEPS_AT_A_TIME + 1;
 		maintenance_step_mutex.unlock();
 	}
 }

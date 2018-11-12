@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
 	size_t stNumberOfPackets = 10000000;
 	size_t stRuns = 20;
 	double dPhi = 0.001; //0.000001; //0.001;
-	double gamma = 1;
+	double gamma = 1.;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
 	uint32_t u32Granularity = 8;
