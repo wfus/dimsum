@@ -100,6 +100,9 @@ private:
     int maintenance();
     void restart_maintenance();
     inline void finish_step();
+
+    void do_update(DIMitem_t, DIMweight_t);
+    void do_some_copying();
     void do_some_clearing();
     void do_some_moving();
 
