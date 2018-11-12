@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
 	// algorithm and data default parameters
 	size_t stNumberOfPackets = 10000000;
 	size_t stRuns = 20;
-	double dPhi = 0.0003; //0.000001; //0.001;
+	double dPhi = 0.001; //0.000001; //0.001;
 	double gamma = 1;
 	bool gammaDefined = false;
 	uint32_t u32Depth = 10;
@@ -479,6 +479,8 @@ int main(int argc, char **argv) {
 		CheckOutput(res, thresh, hh, SALS, exact);
 		res = dimsumpp.output(thresh);
 		CheckOutput(res, thresh, hh, SDIMSUMpp, exact);
+		res = dimsum.output(thresh);
+		CheckOutput(res, thresh, hh, SDIMSUM, exact);
 
 		stStreamPos += stRunSize;
 	} 
@@ -487,7 +489,7 @@ int main(int argc, char **argv) {
 	stNumberOfPackets = data.size();
 	PrintOutput("ALS", ALS_Size(als), SALS, stNumberOfPackets);
 	PrintOutput("DSpp", dimsumpp.size(), SDIMSUMpp, stNumberOfPackets);
-	PrintOutput("DSpp", dimsum.size(), SDIMSUM, stNumberOfPackets);
+	PrintOutput("DS", dimsum.size(), SDIMSUM, stNumberOfPackets);
 	PrintOutput("CM", CM_Size(cm), SCM, stNumberOfPackets);
 
 	ALS_Destroy(als);

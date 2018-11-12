@@ -19,7 +19,7 @@
 #define STEPS_AT_A_TIME 1
 #define BLOCK_SIZE 1
 
-#define DIMSUM_VERBOSE true
+#define DIMSUM_VERBOSE false 
 
 
 #ifndef DIMCounter 

@@ -53,11 +53,13 @@ DIMSUM::DIMSUM(float ep, float g) {
 
 
 DIMSUM::~DIMSUM() {
-    std::cout << "Destroying" << std::endl;
-    maintenance_step_mutex.unlock();
-    finish_update_mutex.unlock();
+    #if DIMSUM_VERBOSE
+        std::cout << "Destroying" << std::endl;
+    #endif
     destroy_passive();
     destroy_active();
+    maintenance_step_mutex.unlock();
+    finish_update_mutex.unlock();
     free(buffer);
 }
 
@@ -82,7 +84,15 @@ void DIMSUM::update(DIMitem_t item, DIMweight_t value) {
 	if (updatesLeft <= 0) {
 		// No more free spots in the active table, we MUST finish up the
 		// maintenance. The iteration should be finished by now
-		assert(stepsLeft == 0);
+        #if DIMSUM_VERBOSE
+            std::cout << "updatesLeft <= 0 - need to update now!" << std::endl
+                << "\tactiveSize: " << activeSize << std::endl
+                << "\tnActive: " << nActive << std::endl
+                << "\tleft2move: " << left2move << std::endl
+                << "\tstepsLeft: " << stepsLeft << std::endl;
+        #endif
+        // the number of steps left should be zero. Or else we're in trouble.
+		// assert(stepsLeft == 0);
 		// check that clearing the passive table is done
 		assert(movedFromPassive == nPassive);
 		if (clearedFromPassive != passiveHashSize) {
@@ -145,8 +155,10 @@ int DIMSUM::maintenance() {
             std::cerr << "In maintenance right now!" << std::endl;
         #endif
         if (all_done) {
-            std::cerr << "Object getting destroyed... goodbye from maintenance thread!";
-            std::cerr << std::endl;
+            #if DIMSUM_VERBOSE
+                std::cerr << "Object getting destroyed... goodbye from maintenance thread!";
+                std::cerr << std::endl;
+            #endif
             return 0;
         }
 
@@ -159,7 +171,9 @@ int DIMSUM::maintenance() {
 			blocksLeft = (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1;
 		}
 		// Copy passive to active
-		//std::cerr << "Copying P to A..." << std::endl;
+        #if DIMSUM_VERBOSE
+		    std::cerr << "Copying P to A..." << std::endl;
+        #endif
 		assert(blocksLeft >= (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1);
 		blocksLeft = (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1;
 		
@@ -582,7 +596,9 @@ void DIMSUM::init_passive() {
 
 void DIMSUM::destroy_passive() {
     //TODO
-	std::cerr << "Destroying the read-only passive table" << std::endl;
+	#if DIMSUM_VERBOSE
+        std::cerr << "Destroying the read-only passive table" << std::endl;
+    #endif
     all_done = true;
     maintenance_step_mutex.unlock();
     free(passiveHashtable);
