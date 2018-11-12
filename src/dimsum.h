@@ -19,6 +19,8 @@
 #define STEPS_AT_A_TIME 1
 #define BLOCK_SIZE 1
 
+#define DIMSUM_VERBOSE true
+
 typedef struct DIMcounter_t DIMCounter;
 struct DIMcounter_t {
     DIMitem_t item; // item identifier

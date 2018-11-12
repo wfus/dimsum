@@ -12,7 +12,6 @@ DIMSUM::DIMSUM(float ep, float g) {
     nPassive = 0;
 
     //TODO: Need to figure out why has to be odd.
-
     passiveSize = (int) (ceil(gamma / epsilon) + ceil(1 / epsilon) - 1);
     activeSize = (int) (ceil(gamma / epsilon) + ceil(1 / epsilon) - 1);
     activeHashSize = DIM_HASHMULT * activeSize;
@@ -142,13 +141,35 @@ int DIMSUM::maintenance() {
     //TODO; finish this!
     for (;;) {
         maintenance_step_mutex.lock();
-        std::cerr << "In maintenance right now!" << std::endl;
+        #if DIMSUM_VERBOSE
+            std::cerr << "In maintenance right now!" << std::endl;
+        #endif
         if (all_done) {
             std::cerr << "Object getting destroyed... goodbye from maintenance thread!";
             std::cerr << std::endl;
             return 0;
         }
-        std::cerr << "Getting out of maintenance..." << std::endl;
+
+        int k = nPassive - ceil(1 / epsilon);
+        if (k >= 0) {
+			int median = in_place_find_kth(buffer, nPassive, k, 1, quantile + 1);
+			quantile = std::max(median, quantile);
+		}
+		else {
+			blocksLeft = (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1;
+		}
+		// Copy passive to active
+		//std::cerr << "Copying P to A..." << std::endl;
+		assert(blocksLeft >= (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1);
+		blocksLeft = (passiveHashSize + nPassive) / STEPS_AT_A_TIME + 1;
+		
+		finishedMedian = true;
+		// Release update if it is waiting
+		blocksLeftThisUpdate = 0;
+
+        #if DIMSUM_VERBOSE
+            std::cerr << "Getting out of maintenance..." << std::endl;
+        #endif
         finish_update_mutex.unlock();
     }
     return 0;
@@ -156,6 +177,9 @@ int DIMSUM::maintenance() {
 
 void DIMSUM::restart_maintenance() {
     // switch counter arrays and zero out the active array
+    #if DIMSUM_VERBOSE
+        std::cout << "Restarting the maintenance." << std::endl;
+    #endif
     std::swap(activeCounters, passiveCounters);
     std::swap(activeHashtable, passiveHashtable);
     nPassive = nActive;
@@ -233,8 +257,46 @@ void DIMSUM::do_some_copying() {
 }
 
 
+/**
+ * Moving records from the passive tables that are above the quantile
+ * back to the active table, so they don't get wiped. Anything that is below
+ * the quantile will get cleared out, not get moved to the active table, and
+ * get overwritten later.
+ */
 void DIMSUM::do_some_moving() {
-
+	int updatesLeft = activeSize - nActive - left2move;
+	stepsLeft = passiveSize + nPassive - movedFromPassive;
+	int steps_left_this_update = stepsLeft / (updatesLeft+1);
+	int largerThanQuantile = 0;
+	for (int i = 0; i < steps_left_this_update; i++) {
+		if (passiveCounters[movedFromPassive].count > quantile) {
+            // If our passive counter is larger than quantile, it's safe and
+            // won't get wiped. However, we should see if its already in the
+            // active table so we can merge it in. When an element is already
+            // in the active table, the passive counter is already added to it
+            // so we don't have to actually merge in the counts.
+			DIMCounter* c = find_item_in_active(passiveCounters[movedFromPassive].item);
+			if (!c) {
+                // if it's not in the active table, move it to the active table
+				add_item(passiveCounters[movedFromPassive].item,
+					passiveCounters[movedFromPassive].count);
+			}
+			--left2move;
+			++largerThanQuantile;
+		}
+		movedFromPassive++;
+		if (movedFromPassive >= nPassive) {
+            // if we've already moved same or more from passive table than the
+            // number of actual records stored in passive, we can stop.
+			left2move = 0;
+			clearedFromPassive = 0;
+			break;
+		}
+	}
+	if (nPassive == movedFromPassive) {
+		// If finished moving
+		left2move = 0;
+	}
 }
 
 void DIMSUM::do_some_clearing() {
