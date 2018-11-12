@@ -457,7 +457,7 @@ void LS_DoSomeClearing(LS_type * LS) {
 	assert(updatesLeft >= 0);
 	LS->stepsLeft = LS->hashsize - LS->clearedFromPassive;
 	int stepsLeftThisUpdate = LS->stepsLeft / (updatesLeft + 1);
-	for (int i = 0; i < stepsLeftThisUpdate; ++i) {
+	for (int i = 0; i < stepsLeftThisUpdate; i++) {
 		LS->passiveHashtable[LS->clearedFromPassive++] = NULL;
 	}
 }

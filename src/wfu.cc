@@ -5,7 +5,7 @@
 #include <iostream>
 #include "alosumpp.h"
 #include "countmin.h"  // naive count min sketch
-#include "dimsumpp.h"  // new dimsum++ algorithm for more space efficiency
+#include "dimsum.h"  // new dimsum++ algorithm for more space efficiency
 
 #define VERBOSE_STATS true
 #define VERBOSE_EXACT false

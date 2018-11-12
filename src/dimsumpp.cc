@@ -1,4 +1,4 @@
-#include "dimsumpp.h"
+#include "dimsum.h"
 
 #define DIM_NULLITEM 0x7FFFFFF
 

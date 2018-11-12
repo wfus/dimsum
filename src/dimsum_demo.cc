@@ -3,7 +3,7 @@
  * DIM-SUM++ algorithm.
  */
 #include <iostream>
-#include "dimsumpp.h"
+#include "dimsum.h"
 
 int main(int argc, char** argv) {
     // epsilon = 1/20

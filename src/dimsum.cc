@@ -205,7 +205,7 @@ void DIMSUM::do_update(DIMitem_t item, DIMweight_t value) {
 	// find whether new item is already stored, if so store it and add one
 	// update heap property if necessary
 	n += value;  // update the total flow that went through this datastructure
-	int hashval = (int)hash31(hasha, hashb, item) % hashsize;
+	int hashval = (int)hash31(hasha, hashb, item) % activeHashSize;
 	DIMCounter** location = &(activeHashtable[hashval]);
 	hashptr = find_item_in_location(item, location);
 	if (hashptr) {

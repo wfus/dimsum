@@ -9,7 +9,8 @@ Handles the evaluation of different
 
 #include "countmin.h"  // naive count min sketch
 
-#include "dimsumpp.h"
+// wfu implemeneted new c++ dimsum stuff
+#include "dimsum.h"
 
 // #include "losum.h"
 #include "alosum.h"
@@ -341,8 +342,8 @@ int main(int argc, char **argv) {
 
 	uint32_t u32DomainSize = 1048575;
 	std::vector<uint32_t> exact(u32DomainSize + 1, 0);
-	Stats SLS, SCM ,SCMH, SCCFC, SALS, SLCL, SDIMSUMpp;
-	std::vector<uint64_t> TLS, TCM, TCMH, TCCFC, TALS, TLCL, TDIMSUMpp;
+	Stats SLS, SCM ,SCMH, SCCFC, SALS, SLCL, SDIMSUMpp, SDIMSUM;
+	std::vector<uint64_t> TLS, TCM, TCMH, TCCFC, TALS, TLCL, TDIMSUMpp, TDIMSUM;
 
 	/***************************************************************************
 	 * DATA LOADING - preload all data to remove IO element from algorithm. 
@@ -404,6 +405,7 @@ int main(int argc, char **argv) {
 	 **************************************************************************/
 	ALS_type* als = ALS_Init(dPhi, gamma);
 	DIMSUMpp dimsumpp(dPhi, gamma);
+	DIMSUM dimsum(dPhi, gamma);
 	CM_type* cm = CM_Init(u32Width, u32Depth, 0);
 	
 	// Number of runs to complete one pass through our trace. 
@@ -450,6 +452,13 @@ int main(int argc, char **argv) {
 		}
 		SDIMSUMpp.dU += t = StopTheClock(start);
 		TDIMSUMpp.push_back(t);
+		
+		start = Clock::now();
+		for (size_t i = stStreamPos; i < stStreamPos + stRunSize; ++i) {
+			dimsum.update(data[i], values[i]);
+		}
+		SDIMSUM.dU += t = StopTheClock(start);
+		TDIMSUM.push_back(t);
 
 
 		start = Clock::now();
@@ -478,6 +487,7 @@ int main(int argc, char **argv) {
 	stNumberOfPackets = data.size();
 	PrintOutput("ALS", ALS_Size(als), SALS, stNumberOfPackets);
 	PrintOutput("DSpp", dimsumpp.size(), SDIMSUMpp, stNumberOfPackets);
+	PrintOutput("DSpp", dimsum.size(), SDIMSUM, stNumberOfPackets);
 	PrintOutput("CM", CM_Size(cm), SCM, stNumberOfPackets);
 
 	ALS_Destroy(als);
